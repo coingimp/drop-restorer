@@ -1,0 +1,33 @@
+name: DropRestorer checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QTWEBENGINE_CHROMIUM_FLAGS: --disable-gpu --disable-gpu-compositing
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Qt WebEngine runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1 libegl1 libnss3 libxkbcommon-x11-0 libxcomposite1 \
+            libxdamage1 libxrandr2 libxtst6 libxi6 libfontconfig1 libpulse0
+      - name: Install DropRestorer
+        run: bash install.sh
+      - name: Check shell launchers
+        run: bash -n install.sh start-drop-restorer.sh enable-drop-restorer-autostart.sh disable-drop-restorer-autostart.sh
+      - name: Compile Python sources
+        run: .venv-drop-restorer/bin/python -m compileall -q drop_restorer tests_drop_restorer
+      - name: Run unit tests
+        run: .venv-drop-restorer/bin/python -m unittest discover -s tests_drop_restorer -v

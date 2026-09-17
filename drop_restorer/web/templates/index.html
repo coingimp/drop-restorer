@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="csrf-token" content="{{ token }}"><title>DropRestorer — восстановление сайтов</title>
+  <link rel="icon" href="data:,"><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/seo.css"><script src="/static/app.js" defer></script><script src="/static/seo.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#projects"><span class="brandmark">↗</span> DropRestorer</a>
+    <p class="tagline">Из архива в ваш WordPress</p>
+    <nav aria-label="Разделы инструмента">
+      <button data-tab="projects">Сохранённые сборки</button>
+      <button data-tab="restore">Восстановление</button>
+      <button data-tab="metadata">Страницы и метаданные</button>
+      <button data-tab="seo">SEO-чек-лист</button>
+      <button data-tab="preview">Превью сайта</button>
+      <button data-tab="checks">Проверки и расходы</button>
+      <button data-tab="agents">Агенты</button>
+      <button data-tab="settings">Настройки</button>
+      <button data-tab="logs">Логи</button>
+    </nav>
+    <div class="local"><i></i> Локальный инструмент <small>127.0.0.1:8780</small></div>
+  </aside>
+  <main>
+    <header class="topbar"><span id="current">Сборка не выбрана</span><span id="agent-badge" class="badge">Без агента</span></header>
+    <div id="notice" class="notice" role="status" hidden></div>
+    <div id="job" class="job" aria-live="polite" hidden>
+      <div class="job-head"><strong id="job-text"></strong><div class="job-actions"><button id="job-toggle" class="small" type="button">Свернуть</button><button class="small" data-tab="logs">Подробные логи</button><button id="cancel" class="small">Отменить</button></div></div>
+      <progress id="progress" max="100" value="0"></progress>
+      <div id="job-details" class="job-details" hidden>
+        <div class="job-stats"><span><b id="job-page">—</b><small>страница</small></span><span><b id="job-files">—</b><small>ресурсы</small></span><span><b id="job-size">—</b><small>получено</small></span><span><b id="job-speed">—</b><small>скорость</small></span><span><b id="job-age">—</b><small>активность</small></span></div>
+        <div class="job-resource"><span id="job-resource-status" class="badge">Ожидание</span><code id="job-resource-url">Подготовка…</code></div>
+      </div>
+    </div>
+
+    <section id="projects" class="panel">
+      <div class="heading"><div><p class="eyebrow">ВАША РАБОТА</p><h1>Сохранённые сборки</h1><p>Продолжите работу с сайтом или восстановите новый архив.</p></div><button class="primary" data-tab="restore">+ Новый сайт</button></div>
+      <div id="projects-list" class="project-grid"></div>
+      <dialog id="delete-dialog" aria-labelledby="delete-heading" aria-describedby="delete-description">
+        <div class="delete-symbol" aria-hidden="true">×</div>
+        <h2 id="delete-heading">Удалить сборку?</h2>
+        <p id="delete-title"></p><p id="delete-url" class="muted"></p>
+        <p id="delete-description">Вся папка сборки будет удалена: исходники, страницы, тема, архивы, снимки и отчёты. Отменить удаление нельзя.</p>
+        <p id="delete-size"></p><p id="delete-id" class="project-id"></p>
+        <p id="delete-error" class="bad" role="alert" hidden></p>
+        <div class="actions"><button id="delete-cancel" autofocus>Отмена</button><button id="delete-confirm" class="danger">Удалить сборку и файлы</button></div>
+      </dialog>
+    </section>
+
+    <section id="restore" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">НОВОЕ ВОССТАНОВЛЕНИЕ</p><h1>Соберите сайт из архива</h1><p>После загрузки инструмент остановится для проверки страниц и метаданных.</p></div></div>
+      <form id="restore-form" class="card">
+        <label>Ссылка на главную страницу в Wayback<input name="main_page" type="url" required placeholder="https://web.archive.org/web/…/https://example.com/"></label>
+        <label>Архивные страницы меню<textarea name="menu_pages" required rows="5" placeholder="Каждая ссылка — с новой строки"></textarea></label>
+        <div class="cols"><label>Язык сайта<input name="lang" required value="cs-CZ"></label><label>Финальный домен <small>необязательно</small><input name="final_domain" placeholder="https://example.com"></label></div>
+        <hr><h2>Раздел казино</h2><p class="muted">Три пустые страницы. Канониклы создаются автоматически; контент и метаданные вы заполните в WordPress.</p>
+        <label>Название раздела в меню<input name="casino_label" value="Казино" required></label>
+        <p>В адресах диакритика заменяется обычными латинскими буквами: í → i, č → c, ř → r. Названия и текст страниц сохраняются.</p>
+        <div class="cols"><label>Название первой страницы<input name="title0" value="Рейтинг казино" required></label><label>Адрес страницы<input name="slug0" value="casino-rating" required></label></div>
+        <div class="cols"><label>Название второй страницы<input name="title1" value="Бонусы казино" required></label><label>Адрес страницы<input name="slug1" value="casino-bonuses" required></label></div>
+        <div class="cols"><label>Название третьей страницы<input name="title2" value="Отзывы игроков" required></label><label>Адрес страницы<input name="slug2" value="casino-reviews" required></label></div>
+        <div class="actions"><button class="primary" type="submit" data-idle>Запустить восстановление</button><span class="muted">Результат сохранится в папке проекта</span></div>
+      </form>
+    </section>
+
+    <section id="metadata" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">ПРОМЕЖУТОЧНЫЙ ЭТАП</p><h1>Страницы и метаданные</h1><p>Одобрите исходные данные или подготовьте изменения. Подключение агента необязательно.</p></div><button id="metadata-preview" data-idle>Посмотреть страницы</button></div>
+      <div id="metadata-empty" class="empty">Откройте сохранённую сборку или запустите восстановление.</div>
+      <div id="metadata-content" hidden>
+        <div id="metadata-status" class="info"></div>
+        <article class="card casino-layout-card">
+          <h2>Оформление казино-страниц WordPress</h2>
+          <p id="casino-layout-help" class="muted">Эти параметры применяются только к трём созданным страницам казино и всему их содержимому. Значение <strong>0</strong> у ширины означает всю доступную ширину контейнера; в старой двухколоночной теме боковое меню сохраняется, а контент автоматически сжимается до ширины экрана.</p>
+          <form id="casino-layout-form">
+            <div class="cols">
+              <label>Ширина контента казино, px <small>0 — без ограничения</small><input name="content_width_px" type="number" min="0" max="2400" step="1"></label>
+              <label>Ширина таблицы офферов, px <small>0 — 100% контента</small><input name="table_width_px" type="number" min="0" max="2400" step="1"></label>
+            </div>
+            <div class="cols">
+              <label>Высота ячейки/строки, px<input name="row_height_px" type="number" min="72" max="400" step="1"></label>
+              <label>Вертикальный отступ ячейки, px<input name="cell_padding_px" type="number" min="0" max="32" step="1"></label>
+            </div>
+            <h3>Ширина колонок оффера, px <small>0 — автоматически</small></h3>
+            <div class="cols casino-cell-widths">
+              <label>Логотип<input name="cell_logo" type="number" min="0" max="1200" step="1"></label>
+              <label>Бонус<input name="cell_bonus" type="number" min="0" max="1200" step="1"></label>
+              <label>Условия<input name="cell_characteristics" type="number" min="0" max="1200" step="1"></label>
+              <label>Рейтинг<input name="cell_rating" type="number" min="0" max="1200" step="1"></label>
+              <label>Кнопка<input name="cell_button" type="number" min="0" max="1200" step="1"></label>
+            </div>
+            <div class="actions"><button id="save-casino-layout" class="primary" type="submit" data-idle>Сохранить размеры и обновить превью</button><span class="muted">На телефоне ширина автоматически становится 100%, чтобы не появлялся горизонтальный скролл.</span></div>
+          </form>
+        </article>
+        <div class="actions card"><button id="keep" class="primary" data-idle>Одобрить без изменений — продолжить</button><button data-tab="agents">Подключить агента для доработки</button><button id="propose" data-idle>Подготовить варианты метаданных</button><button id="apply-meta" data-idle>Применить варианты — продолжить</button><button id="reopen" data-idle>Открыть исходники в новой сборке</button></div>
+        <div id="metadata-list"></div>
+      </div>
+    </section>
+
+    <section id="seo" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">ПЕРЕД СОЗДАНИЕМ ТЕМЫ</p><h1>SEO-чек-лист</h1><p>Все 58 требований и найденные замечания. Решение продолжить принимаете вы.</p></div></div>
+      <div id="seo-content" class="empty">Выберите сохранённую сборку.</div>
+    </section>
+
+    <section id="preview" class="panel wide" hidden>
+      <div class="heading"><div><p class="eyebrow">ПРОВЕРКА ПЕРЕД УПАКОВКОЙ</p><h1>Превью сайта</h1><p>Проверьте страницы, меню и отображение на разных устройствах.</p></div><button id="open-preview" data-idle>Открыть актуальное превью</button></div>
+      <div id="preview-empty" class="empty">Выберите сборку и откройте превью.</div>
+      <div id="preview-content" hidden>
+        <div class="toolbar card">
+          <label>Страница<select id="page-picker"></select></label><label>Экран<select id="device"><option value="Desktop">Desktop · 1920 × 1080</option><option value="Tablet">Tablet · 768 × 1024</option><option value="Mobile">Mobile · 375 × 812</option></select></label>
+          <label>Масштаб<select id="zoom"><option value="fit">По ширине</option><option value="0.25">25%</option><option value="0.5">50%</option><option value="0.75">75%</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+          <button id="fullscreen">На весь экран</button>
+        </div>
+        <div id="viewport" class="viewport"><div id="frame-size"><iframe id="site-frame" title="Восстановленный сайт" sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe></div></div>
+        <div class="actions card"><button id="capture-one" data-idle>Снимок страницы</button><button id="capture-all" data-idle>Снимки всех режимов</button><button id="files-button" data-idle>Файлы и снимки</button><button data-tab="checks">Проверки и расходы</button><button id="edit-toggle" data-idle>Исправления</button></div>
+        <div id="files-list" class="card" hidden></div>
+        <div id="editor" class="card" hidden><h2>Исправления</h2><p class="muted">Сохранение сбрасывает одобрение. После правки снова откройте превью.</p><div class="actions"><button id="edit-parameters">Изменить параметры новой сборки</button><button id="logo" data-idle>Перегенерировать логотип</button><label>Тема фавикона<select id="favicon-topic"><option value="auto">Определить автоматически</option><option value="cinema">Кино и театр</option><option value="cycling">Велоспорт</option><option value="sport">Спорт</option><option value="education">Образование</option><option value="travel">Путешествия</option><option value="food">Еда и рестораны</option><option value="music">Музыка</option><option value="nature">Природа</option><option value="technology">Технологии</option><option value="casino">Казино</option></select></label><button id="favicon" data-idle>Создать фавикон по теме</button><img id="favicon-preview" width="64" height="64" alt="Фавикон сайта" hidden><p id="favicon-info" class="muted"></p><button id="load-html" data-idle>Загрузить HTML выбранной страницы</button></div><label id="html-label" hidden>HTML страницы<textarea id="html-editor" rows="16" spellcheck="false"></textarea></label><button id="save-html" hidden data-idle>Сохранить HTML</button></div>
+        <div id="approval" class="card approval"><label class="checkbox"><input id="confirmed" type="checkbox">Я просмотрел сайт и одобряю текущую версию для продолжения</label><p id="approval-hint" class="muted"></p><button id="package" class="primary" data-idle>Одобрить и упаковать</button><div id="archive-result"></div></div>
+      </div>
+    </section>
+
+    <section id="checks" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">КАЧЕСТВО СБОРКИ</p><h1>Проверки и расходы</h1><p>Отчёт по страницам, экспорту WordPress, удалённым элементам и запросам агента.</p></div><button id="run-checks" data-idle>Повторить проверки</button></div>
+      <div id="checks-content" class="empty">Отчёт появится после сборки сайта.</div>
+    </section>
+
+    <section id="agents" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">ПОМОЩЬ С МЕТАДАННЫМИ И ИЗОБРАЖЕНИЯМИ</p><h1>Агенты</h1><p>Подключение сохраняет ключ только в памяти текущего запуска.</p></div></div>
+      <form id="agent-form" class="card"><label>Endpoint<input name="endpoint" type="url" value="https://openrouter.ai/api/v1" required></label><label>Модель<input name="model" required placeholder="Идентификатор модели"></label><label>API-ключ<input name="api_key" type="password" autocomplete="off" placeholder="Введите ключ здесь"></label><button type="submit" class="primary" data-idle>Подключить</button><p class="muted">Само подключение не отправляет запрос. Тест и генерация выполняются по нажатию и могут расходовать баланс провайдера.</p></form>
+      <div id="agents-list"></div><div id="connection-cost" class="info"></div>
+      <article class="card" id="metadata-sample-card">
+        <h2>Проба метаданных на одной странице</h2>
+        <p>Выберите скачанную страницу и сравните её метаданные с предложением модели. Проба не меняет сайт и доступна до и после выбора метаданных.</p>
+        <label>Страница для пробы<select id="sample-page" data-idle></select></label>
+        <button id="sample-metadata" class="primary" data-idle>Сгенерировать пример</button>
+        <p id="sample-hint" class="muted"></p>
+        <div id="sample-result" aria-live="polite"></div>
+      </article>
+    </section>
+
+    <section id="settings" class="panel" hidden>
+      <div class="heading"><div><p class="eyebrow">ВАШИ ПАРАМЕТРЫ</p><h1>Настройки</h1><p>Значения по умолчанию для новых восстановлений.</p></div></div>
+      <form id="settings-form" class="card"><label>Язык сайта<input name="lang" value="cs-CZ" required></label><label>Финальный домен<input name="final_domain" placeholder="Домен из архива, если поле пустое"></label><label class="checkbox"><input name="auto_screens" type="checkbox">Сохранять снимки всех режимов при первом открытии готового превью</label><button type="submit" class="primary" data-idle>Сохранить настройки</button></form>
+    </section>
+
+    <section id="logs" class="panel" hidden><div class="heading"><div><p class="eyebrow">ХОД РАБОТЫ</p><h1>Логи</h1><p>Сообщения текущего запуска. Журнал выбранной сборки доступен в её файлах.</p></div></div><pre id="log-lines" class="logs">Пока нет сообщений.</pre></section>
+  </main>
+</body>
+</html>

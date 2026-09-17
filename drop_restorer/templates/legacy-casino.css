@@ -1,0 +1,45 @@
+/* Structural adapter for the legacy Joomla shell, scoped to casino pages. */
+body.dr-joomla-casino #ja-wrapper {
+  width: min(100%, 950px); min-width: 0; margin: 0 auto; background: #fff;
+  color: #26313b; font: 400 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.dr-joomla-casino #ja-mainnavwrap {
+  display: flex; align-items: center; flex-wrap: wrap; background: #fff;
+  position: relative; z-index: 60; padding: 8px 16px; box-sizing: border-box;
+}
+.dr-joomla-casino #ja-mainnavwrap::after { display: none; }
+.dr-joomla-casino #ja-mainnav { float: none; width: 100%; min-width: 0; }
+.dr-joomla-casino #ja-mainnav .dr-navigation { font: 600 14px/1.4 system-ui, sans-serif; }
+.dr-joomla-casino #ja-mainnav .dr-menu { justify-content: center; }
+.dr-joomla-casino #ja-mainnav .dr-menu > li > a,
+.dr-joomla-casino #ja-mainnav .dr-casino-toggle { color: #26313b; }
+.dr-joomla-casino #ja-mainnav .dr-menu > li > a:hover,
+.dr-joomla-casino #ja-mainnav .dr-casino-toggle:hover { color: #b51d26; background: #f6f7f8; }
+.dr-joomla-casino #ja-headerwrap { height: auto; background: #fff; }
+.dr-joomla-casino #ja-header {
+  height: auto; aspect-ratio: var(--dr-banner-ratio, 4 / 1); width: 100%; min-width: 0;
+  background-size: cover !important; background-position: center !important;
+}
+.dr-joomla-casino #ja-wrapper :is(#ja-containerwrap, #ja-containerwrap-f, #ja-containerwrap-fl, #ja-containerwrap-fr,
+  #ja-container, #ja-mainbody, #ja-mainbody-f, #ja-mainbody-fl, #ja-mainbody-fr, #ja-contentwrap) {
+  display: block; float: none; width: 100%; min-width: 0; box-sizing: border-box;
+  margin: 0; padding: 0; background: #fff;
+}
+.dr-joomla-casino #ja-content.dr-casino-content {
+  width: 100%; padding: clamp(24px, 5vw, 48px) clamp(20px, 5vw, 48px);
+  min-height: 45vh; background: #fff; color: #26313b;
+}
+.dr-joomla-casino #ja-footerwrap { border-top: 1px solid #dbe1e5; padding: 22px clamp(20px, 5vw, 48px); }
+.dr-joomla-casino #ja-footer {
+  float: none; width: 100%; padding: 0; background: none;
+  font: 400 12px/1.7 system-ui, sans-serif; color: #56616b;
+}
+.dr-joomla-casino #ja-footer small { float: none; padding: 0; color: inherit; }
+.dr-joomla-casino #ja-mainnavwrap > .dr-legacy-logo { flex: 0 0 auto; max-width: 100%; padding: 8px 12px; }
+.dr-joomla-casino #ja-mainnavwrap > .dr-template-placeholder { display: none; }
+@media (max-width: 800px) {
+  .dr-joomla-casino #ja-mainnavwrap { padding: 10px 16px; }
+  .dr-joomla-casino #ja-mainnav .dr-menu { align-items: stretch; }
+  .dr-joomla-casino #ja-mainnav .dr-menu > li > a,
+  .dr-joomla-casino #ja-mainnav .dr-casino-toggle { font-size: 16px; }
+}

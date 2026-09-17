@@ -1,0 +1,91 @@
+/* The archived layout has a 980px frame and absolutely positioned header.
+   Keep its assets/type/colors, but let the frame and header participate in flow. */
+body.dr-school-layout {min-width:0!important; margin:0; background:#fff!important}
+.dr-school-layout #hp-body-background {display:none}
+.dr-school-layout #content-holder {width:100%; max-width:980px; min-width:0; margin:0 auto; box-sizing:border-box}
+.dr-school-layout #header-main {height:auto; min-height:98px; padding:15px 24px; box-sizing:border-box; background:#f7f7f7}
+.dr-school-layout #logo {position:static; width:min(366px,100%); margin:0; padding:0}
+.dr-school-layout #logo img {display:block; width:auto; max-width:100%; height:auto}
+.dr-school-layout #logo span {display:none}
+.dr-school-layout #header-secondary {position:relative; inset:auto; width:100%; height:auto; z-index:50}
+.dr-school-layout #primary-nav {position:relative; inset:auto; width:100%; height:auto; padding:10px 8px; box-sizing:border-box; background:#fff; border-bottom:1px solid #ddd; color:#303030; font-size:16px}
+.dr-school-layout #primary-nav > .dr-menu {justify-content:space-between}
+.dr-school-layout #primary-nav .dr-casino-toggle {color:#a91f26}
+.dr-school-layout #main-article {min-width:0; padding-bottom:40px; margin-bottom:55px; box-sizing:border-box; background:#fff; display:flow-root}
+.dr-school-layout #main-article-header {height:auto}
+.dr-school-layout #hp-carousel {height:auto; width:100%; overflow:hidden; position:relative; background:#edf0f2}
+.dr-school-layout #dr-school-slides {width:100%; margin:0; padding:0; list-style:none}
+.dr-school-layout #dr-school-slides > .dr-slide {position:relative; width:100%; height:auto; min-height:440px; padding:0; margin:0; list-style:none}
+.dr-school-layout #dr-school-slides > .dr-slide[hidden] {display:none!important}
+.dr-school-layout #dr-school-slides > .dr-slide > img {position:static; width:100%; height:auto; aspect-ratio:980/440; object-fit:cover; display:block}
+.dr-school-layout #hp-carousel .carousel-claim {position:absolute; inset:50% 24px auto auto; transform:translateY(-50%); box-sizing:border-box; width:42%; height:auto; min-height:200px; padding:24px 28px; overflow:visible; background:#fffffff2; font-weight:400}
+.dr-school-layout #hp-carousel .carousel-claim h3 {padding:0 0 16px; font-size:32px; line-height:1.15; color:#333}
+.dr-school-layout #hp-carousel .carousel-claim p {padding:0; margin:0; font-size:17px; line-height:1.45; color:#555; text-align:left}
+.dr-school-layout #hp-carousel .carousel-claim .more {display:block; position:static; margin-top:12px; font-size:15px}
+.dr-school-layout .dr-slide-controls {position:absolute; bottom:12px; right:16px; display:flex; gap:6px; padding:4px; background:#0005; border-radius:5px}
+.dr-school-layout .dr-slide-controls button {width:36px; height:36px; border:1px solid #fff8; border-radius:3px; background:#fffd; color:#202020; cursor:pointer; font:600 15px Arial,sans-serif}
+.dr-school-layout .dr-slide-controls button[aria-pressed="true"] {background:#b2222b; color:#fff; border-color:#b2222b}
+.dr-school-layout .dr-missing-image {display:none!important}
+.dr-school-layout .hp-news-holder {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:28px; margin:0 24px 32px}
+.dr-school-layout .hp-news-holder-column {float:none; width:auto; min-width:0; margin:0}
+.dr-school-layout .hp-news-holder .clear {display:none}
+.dr-school-layout .hp-news-holder h3 {font-size:28px; line-height:1.2}
+.dr-school-layout .hp-more-info-column.right {display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px}
+.dr-school-layout .hp-more-info-column.right > .dr-unlinked {display:block; font-size:13px; line-height:1.35}
+.dr-school-layout .hp-more-info-column.right > .dr-unlinked img {display:block; padding:0; margin:0 0 8px}
+.dr-school-layout .hp-more-info-column.right > .dr-unlinked span {display:block}
+.dr-school-layout #main-article-right {width:calc(100% - 209px); box-sizing:border-box; padding:20px 32px; min-width:0}
+.dr-school-layout #main-article-right p {line-height:1.6; text-align:left}
+.dr-school-layout #main-article-right img {max-width:100%!important; height:auto!important}
+.dr-school-layout #main-article-right table {max-width:100%; width:100%!important; table-layout:fixed; overflow-wrap:anywhere}
+.dr-school-layout .dr-casino-content {padding:36px 28px!important; min-height:480px}
+.dr-school-layout .dr-casino-content h1 {font-size:34px; line-height:1.2; margin:0 0 24px}
+.dr-school-layout #main-footer {height:auto; min-width:0; width:100%; margin-top:40px}
+.dr-school-layout #main-footer .center-footer-holder {width:100%; max-width:980px; box-sizing:border-box; margin:0 auto; padding:24px; display:flex; flex-wrap:wrap; gap:24px}
+.dr-school-layout #main-footer .footer-column {float:none; flex:1 1 140px; width:auto!important; padding:16px 0!important; margin:0!important; color:#bbb; line-height:1.5}
+.dr-school-layout #main-footer .footer-column h3 {color:#ddd}
+.dr-school-layout #main-footer .obsah_paticka {width:100%; padding:10px; box-sizing:border-box; min-width:0; margin:0}
+.dr-school-layout #main-footer table {max-width:100%; width:100%; table-layout:fixed; overflow-wrap:anywhere}
+.dr-school-layout #main-footer .clear, .dr-school-layout #main-footer .center-footer-holder > br {display:none}
+@media(max-width:1000px) {
+  .dr-school-layout .hp-more-info-holder, .dr-school-layout .hp-our-school-holder, .dr-school-layout .hp-school-partners {display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:0; padding:20px 24px}
+  .dr-school-layout .hp-more-info-column, .dr-school-layout .hp-our-school-column, .dr-school-layout .hp-school-partners-column {float:none; width:auto!important; min-width:0; padding:0!important; margin:0!important}
+  .dr-school-layout .hp-more-info-holder > .clear, .dr-school-layout .hp-our-school-holder > .clear, .dr-school-layout .hp-school-partners > .clear {display:none}
+  .dr-school-layout .hp-school-partners > h2 {grid-column:1/-1; padding:0}
+  .dr-school-layout .hp-our-school-column.right.calendar h2 {position:static; width:auto; height:auto}
+  .dr-school-layout #calendar-holder, .dr-school-layout #calendar-event-holder {position:static; width:auto; height:auto; min-height:0}
+  .dr-school-layout #calendar {position:relative; inset:auto; width:100%; max-width:360px; height:auto; padding:12px; box-sizing:border-box; display:flow-root}
+  .dr-school-layout #calendar .calendar-header {width:100%; display:grid; grid-template-columns:repeat(7,minmax(0,1fr))}
+  .dr-school-layout #calendar .calendar-header .week {width:auto; float:none}
+  .dr-school-layout #calendar .calendar-days {display:grid; grid-template-columns:repeat(7,minmax(0,1fr))}
+  .dr-school-layout #calendar .calendar-days > div {width:auto; float:none}
+  .dr-school-layout #calendar .calendar-days > .clear {display:none}
+}
+@media(max-width:800px) {
+  .dr-school-layout #header-main {min-height:0; padding:16px}
+  .dr-school-layout #primary-nav {padding:10px 16px}
+  .dr-school-layout #main-article {margin-bottom:24px}
+  .dr-school-layout #main-article:has(#main-article-right) {display:flex; flex-direction:column}
+  .dr-school-layout #main-article-right {order:0; width:100%; float:none; padding:24px 20px}
+  .dr-school-layout #main-article-right, .dr-school-layout #main-article-right p, .dr-school-layout #main-article-right li {font-size:16px; line-height:1.6}
+  .dr-school-layout #main-article-left {order:1; width:100%; float:none; padding:0 20px; box-sizing:border-box}
+  .dr-school-layout #left-column-fotogallery {width:100%; padding:0; display:flex; flex-wrap:wrap; gap:8px}
+  .dr-school-layout #left-column-fotogallery .left-column-fotogallery-title {width:100%}
+  .dr-school-layout #left-column-fotogallery .dr-unlinked {display:block}
+  .dr-school-layout .hp-more-info-holder, .dr-school-layout .hp-our-school-holder, .dr-school-layout .hp-school-partners {grid-template-columns:1fr}
+  .dr-school-layout #hp-carousel .carousel-claim {right:20px; width:48%; padding:20px; min-height:0}
+  .dr-school-layout #hp-carousel .carousel-claim h3 {font-size:26px}
+  .dr-school-layout #dr-school-slides > .dr-slide {min-height:0}
+  .dr-school-layout .dr-casino-content {min-height:380px}
+}
+@media(max-width:600px) {
+  .dr-school-layout #hp-carousel .carousel-claim {position:static; transform:none; width:100%; padding:24px 20px; background:#f2f4f5}
+  .dr-school-layout #hp-carousel .carousel-claim h3 {font-size:28px; line-height:1.2}
+  .dr-school-layout #hp-carousel .carousel-claim p {font-size:16px; line-height:1.5}
+  .dr-school-layout .dr-slide-controls {position:static; border-radius:0; justify-content:center; padding:10px; background:#e5e8eb}
+  .dr-school-layout .dr-slide-controls button {width:44px; height:44px}
+  .dr-school-layout .hp-news-holder {grid-template-columns:1fr; margin:0 20px 24px; gap:20px}
+  .dr-school-layout .h2-title {font-size:26px; padding:24px 20px 12px}
+  .dr-school-layout .hp-news-holder h3 {font-size:25px}
+  .dr-school-layout #main-footer .center-footer-holder {padding:20px; gap:16px}
+}

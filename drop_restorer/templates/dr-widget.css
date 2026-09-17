@@ -1,0 +1,24 @@
+.dr-casino-table{width:min(100%,var(--dr-casino-table-width,100%));max-width:100%;min-width:0;box-sizing:border-box;overflow-wrap:anywhere}.dr-casino-table *{box-sizing:border-box}.dr-casino-table img{max-width:100%;height:auto}.dr-casino-table table{width:100%;max-width:100%;table-layout:fixed}.dr-casino-table a{overflow-wrap:anywhere}.dr-widget-error{padding:20px;border:1px solid #d4d9de;border-radius:8px;background:#f7f8f9;color:#334;font:16px/1.5 sans-serif}@media(max-width:600px){.dr-casino-table .casino-list{min-width:0;max-width:100%}.dr-casino-table [style*="min-width"]{min-width:0!important}}
+.dr-casino-table .casino-row__label{font-size:13px!important;line-height:1.3!important}
+.dr-casino-table .casino-row__logo a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;max-width:100%}.dr-casino-table .casino-row__logo a p{position:static;margin:0;white-space:normal;overflow-wrap:anywhere}
+
+/* Compact vertical rhythm; retain provider column widths and all offer text. */
+.dr-casino-table .casino-table{border-spacing:0 10px}
+.dr-casino-table .casino-table tbody tr td{padding-top:12px;padding-bottom:12px;line-height:1.4}
+.dr-casino-table .casino-table thead th{padding-top:9px;padding-bottom:9px;line-height:1.4}
+.dr-casino-table .casino-table tbody .casino-row__characteristics ul{row-gap:6px}
+.dr-casino-table .casino-table tbody .casino-row__characteristics li{line-height:1.4}
+.dr-casino-table .casino-table tbody .casino-row__logo a{row-gap:4px;line-height:1.4}
+.dr-casino-table .casino-table tbody .casino-row__logo img{height:56px;object-fit:contain}
+.dr-casino-table .casino-table tbody .casino-row__button .casino-btn{min-height:44px;padding-top:8px;padding-bottom:8px;line-height:1.35}
+.dr-casino-table[data-row-height] .casino-table tbody tr{height:var(--dr-offer-row-height)!important;min-height:0!important}
+.dr-casino-table[data-row-height] .casino-table tbody tr td{height:auto!important;min-height:0!important}
+.dr-casino-table[data-dr-casino-layout] .casino-table tbody tr{height:var(--dr-offer-row-height);min-height:0!important}
+.dr-casino-table[data-dr-casino-layout] .casino-table tbody tr td{padding-top:var(--dr-casino-cell-padding)!important;padding-bottom:var(--dr-casino-cell-padding)!important}
+@media(max-width:768px){
+ .dr-casino-table[data-row-height] .casino-table tbody tr{height:auto!important;min-height:var(--dr-offer-row-height)!important}
+ .dr-casino-table .casino-table tbody tr td{padding-top:6px;padding-bottom:6px}
+ .dr-casino-table .casino-table tbody .casino-row__logo a{margin-top:28px!important}
+ .dr-casino-table .casino-table tbody .casino-row__logo img{height:56px}
+ .dr-casino-table .casino-table tbody .casino-row__button{padding-bottom:12px}
+}
