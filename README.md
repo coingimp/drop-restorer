@@ -5,6 +5,8 @@
 код, тесты и лаунчеры для Windows и Linux. Личные сборки, архивы сайтов, ключи,
 логи и виртуальное окружение сюда не копируются.
 
+Репозиторий: <https://github.com/coingimp/drop-restorer>
+
 Подробная пошаговая инструкция установки находится в [`INSTALL.md`](INSTALL.md).
 
 ## Linux
@@ -69,10 +71,24 @@ bash -n install.sh start-drop-restorer.sh enable-drop-restorer-autostart.sh disa
 настроенного headless‑режима. После запуска панели доступен `/health`; он должен вернуть
 HTTP 200 и рабочую папку этого checkout.
 
-## Публикация в Git
+## Обновление и собственный fork
 
-Эта папка не содержит вложенного `.git`, чтобы её можно было сначала проверить. После
-проверки создайте отдельный репозиторий (для начала лучше private):
+Клонирование опубликованной версии:
+
+```bash
+git clone https://github.com/coingimp/drop-restorer.git drop-restorer
+cd drop-restorer
+```
+
+Для собственного fork создайте отдельный репозиторий, добавьте его как `origin` и
+отправьте ветку `main`:
+
+```bash
+git remote set-url origin <URL-вашего-репозитория>
+git push -u origin main
+```
+
+Если исходники передаются архивом без Git-истории, репозиторий можно создать заново:
 
 ```bash
 git init -b main

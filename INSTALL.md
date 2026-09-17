@@ -25,7 +25,7 @@ PYTHON_BIN=python3.11 bash install.sh
 Клонируйте репозиторий и установите приложение:
 
 ```bash
-git clone <URL-репозитория> drop-restorer
+git clone https://github.com/coingimp/drop-restorer.git drop-restorer
 cd drop-restorer
 bash install.sh
 ```
