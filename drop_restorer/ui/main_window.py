@@ -201,6 +201,7 @@ class MainWindow(QMainWindow):
         grid.addWidget(QLabel('Название раздела'), 0, 0)
         grid.addWidget(self.casino_label, 0, 1)
         self.casino_fields = []
+        card.addWidget(QLabel('Публичный формат адреса: /casino/<слаг>/. В поле ниже указывается только слаг страницы.', objectName='muted'))
         for i, page in enumerate(DEFAULT_CASINO, 1):
             title, slug = QLineEdit(page.title), QLineEdit(page.slug)
             title.setPlaceholderText('Название на языке сайта')

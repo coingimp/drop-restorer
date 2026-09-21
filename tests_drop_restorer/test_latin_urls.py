@@ -26,6 +26,14 @@ class LatinUrlTests(unittest.TestCase):
         with self.assertRaises(RestorationError):
             values.validate()
 
+    def test_casino_routes_have_a_stable_section_prefix(self):
+        values = request()
+        self.assertEqual([page.route for page in values.casino_pages], [
+            '/casino/casino-rating/', '/casino/casino-bonuses/', '/casino/casino-reviews/'
+        ])
+        values.casino_pages[0] = CasinoPage('Nejlepší casino', 'nejlepsi-zahranicn%C3%AD-casino')
+        self.assertEqual(values.casino_pages[0].route, '/casino/nejlepsi-zahranicni-casino/')
+
     def test_pipeline_creates_latin_routes_without_changing_titles(self):
         with tempfile.TemporaryDirectory() as folder:
             pipeline = Pipeline(Path(folder), client=FixtureArchive())
@@ -34,7 +42,7 @@ class LatinUrlTests(unittest.TestCase):
             pending = pipeline.run(values)
             build = pipeline.finish(pending, 'keep')
             casino = next(page for page in build.pages if page.casino)
-            self.assertEqual(casino.route, '/nejlepsi-zahranicni-casino/')
+            self.assertEqual(casino.route, '/casino/nejlepsi-zahranicni-casino/')
             self.assertEqual(casino.title, 'Nejlepší zahraniční casino')
             self.assertIn(casino.route, [a.get('href') for a in parse_html(build.pages[0].html).select('a')])
             self.assertTrue(parse_html(casino.html).select_one('link[rel=canonical]')['href'].endswith(casino.route))

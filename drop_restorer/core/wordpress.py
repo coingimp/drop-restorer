@@ -50,8 +50,9 @@ def wxr(build, contents: dict):
         guid.set('isPermaLink', 'false')
         element(item, 'content:encoded', '' if page.casino else contents[page.key], True)
         element(item, 'excerpt:encoded', '', True)
+        casino_slug = unquote(page.route.split('?', 1)[0].rstrip('/').rsplit('/', 1)[-1]) if page.casino else ''
         for key, value in [('post_id', number), ('post_date', export_date), ('post_date_gmt', export_date),
-                           ('post_type', 'page'), ('status', 'publish'), ('post_name', unquote(page.route.strip('/')) if page.casino else 'dr-' + page.key),
+                           ('post_type', 'page'), ('status', 'publish'), ('post_name', casino_slug if page.casino else 'dr-' + page.key),
                            ('post_parent', 0), ('menu_order', number), ('comment_status', 'closed'), ('ping_status', 'closed')]:
             element(item, 'wp:' + key, value)
         metadata = {'_dr_key': page.key, '_dr_route': page.route, '_dr_casino': '1' if page.casino else '0',

@@ -13,7 +13,7 @@ class NavigationTests(unittest.TestCase):
     def setUp(self):
         self.request = request()
         self.pages = [Page('home', '/', 'A very long archived homepage title', ''), Page('about', '/about/', 'About', '')]
-        self.pages += [Page(page.slug, '/' + page.slug + '/', page.title, '', casino=True) for page in self.request.casino_pages]
+        self.pages += [Page(page.slug, page.route, page.title, '', casino=True) for page in self.request.casino_pages]
 
     def test_primary_menu_wins_over_earlier_sidebar_and_footer_columns(self):
         soup = parse_html('''<body><nav id="sidebar"><ul><li>Sidebar text</li></ul></nav>
@@ -110,7 +110,7 @@ class NavigationTests(unittest.TestCase):
                  Page('registry', '/rejstrik.htm', 'TOCOEN (Výpis z obchodního rejstříku)', ''),
                  Page('cooperation', '/spoluprace.htm', 'TOCOEN (Spolupráce)', ''),
                  Page('contact', '/kontakt.htm', 'TOCOEN (Kontakt)', '')]
-        pages += [Page(page.slug, '/' + page.slug + '/', page.title, '', casino=True)
+        pages += [Page(page.slug, page.route, page.title, '', casino=True)
                   for page in self.request.casino_pages]
         buttons = ''.join(f'''<object width="168" height="19" id="{name}">
           <param name="movie" value="images/{name}.swf"><embed src="images/{name}.swf" width="168" height="19" name="{name}"></embed></object>'''

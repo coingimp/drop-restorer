@@ -107,7 +107,9 @@ class CasinoPage:
 
     @property
     def route(self) -> str:
-        return latin_url_path('/' + self.slug.strip('/') + '/')
+        # Casino articles live under one stable section.  Keep the editable
+        # value as the leaf slug, while the public URL is always hierarchical.
+        return latin_url_path('/casino/' + self.slug.strip('/') + '/')
 
 
 DEFAULT_CASINO = (

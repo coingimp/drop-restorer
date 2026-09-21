@@ -160,6 +160,8 @@ class WebTests(unittest.TestCase):
                 self.assertIn('id="dr-primary-menu"', response.text)
                 self.assertIn('/__drop_restorer_preview_bridge.js', response.text)
                 self.assertNotIn('/__drop_restorer_preview_bridge.js', (build.root / 'pages' / (page.key + '.html')).read_text(encoding='utf-8'))
+            self.assertEqual(session.get(info['origin'] + '/casino/casino-rating/', timeout=5).status_code, 200)
+            self.assertEqual(session.get(info['origin'] + '/casino-rating/', timeout=5).status_code, 404)
             self.assertIn(self.origin, session.get(info['origin'] + '/__drop_restorer_preview_bridge.js', timeout=5).text)
         self.assertEqual(self.get('/casino-rating/').status_code, 404)
 

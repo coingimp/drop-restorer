@@ -49,7 +49,7 @@ class ArticleTests(unittest.TestCase):
             origin = server.origin
             try:
                 session = requests.Session(); session.trust_env = False
-                response = session.get(origin + '/casino-rating/', timeout=10)
+                response = session.get(origin + '/casino/casino-rating/', timeout=10)
                 self.assertEqual(response.status_code, 200)
                 soup = BeautifulSoup(response.content, 'lxml')
                 self.assertIsNotNone(soup.select_one('link[href="/assets/dr-article.css"]'))

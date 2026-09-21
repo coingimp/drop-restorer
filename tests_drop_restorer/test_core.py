@@ -118,6 +118,7 @@ class InputTests(unittest.TestCase):
 
     def test_slug_collision(self):
         item = request()
+        item.menu_pages = [item.menu_pages[0].replace('/about/', '/casino/about/')]
         item.casino_pages[0] = CasinoPage('Collision', 'about')
         with self.assertRaises(RestorationError):
             item.validate()
@@ -257,11 +258,14 @@ class PipelineTests(unittest.TestCase):
         for item, page in zip(items, self.build.pages):
             meta = {node.findtext('wp:meta_key', namespaces=NS): node.findtext('wp:meta_value', namespaces=NS)
                     for node in item.findall('wp:postmeta', NS)}
+            post_name = item.findtext('wp:post_name', namespaces=NS)
             if page.casino:
                 self.assertFalse(item.findtext('content:encoded', namespaces=NS))
                 self.assertEqual(meta['_wp_page_template'], 'casino-page.php')
                 self.assertNotIn('_dr_seo_title', meta)
                 self.assertNotIn('_dr_description', meta)
+                self.assertEqual(post_name, page.route.rstrip('/').rsplit('/', 1)[-1])
+                self.assertNotIn('/', post_name)
             else:
                 self.assertIn('<main>', item.findtext('content:encoded', namespaces=NS))
             self.assertEqual(meta['_dr_route'], page.route)
