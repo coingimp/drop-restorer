@@ -176,7 +176,7 @@ function dr_widget_styles($table) {
             wp_enqueue_style('dr-hds-'.$file,'https://cryptocasinokingdom.com/_widget/2.0/'.$file.'.css',array('dr-hds-vendor'),null);
         }
     }
-    wp_enqueue_style('dr-widget',get_template_directory_uri().'/assets/dr-widget.css',array('dr-hds-vendor'),'0.1.9');
+    wp_enqueue_style('dr-widget',get_template_directory_uri().'/assets/dr-widget.css',array('dr-hds-vendor'),'0.1.10');
 }
 function dr_casino_table_shortcode($attributes) {
     $attributes=shortcode_atts(array('id'=>'','row_height'=>''),$attributes,'casino_table');

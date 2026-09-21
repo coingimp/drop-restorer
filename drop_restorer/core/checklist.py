@@ -17,7 +17,7 @@ from .models import RestorationError
 from .review import content_node, source_metadata
 from .seo_contract import DEFINITIONS, VERSION, fingerprint, save_json
 from .seo_routes import indexable
-from .indexation import robot_tags
+from .indexation import indexation_blockers, robot_tags
 
 
 def read_json(path, default):
@@ -131,7 +131,7 @@ def inspect_site(build):
             if indexed:
                 for key in ('robots_allow','robots_sections'):
                     record(key, robot_parser.can_fetch('*',build.request.origin+route), 'Сканирование разрешено.',route)
-                restricted = bool(re.search(r'\b(?:noindex|none)\b', robots_meta) or soup.find('noindex'))
+                restricted = bool(re.search(r'\b(?:noindex|none)\b', robots_meta) or indexation_blockers(soup))
                 record('noindex',not restricted, 'robots='+(robots_meta or 'не задан'),route)
                 record('title_count',len(soup.select('title'))==1 and bool(metadata['title'].strip()),f'Title: {len(soup.select("title"))}',route)
                 record('description_count',len(soup.select('meta[name="description" i]'))==1 and bool(metadata['description'].strip()),

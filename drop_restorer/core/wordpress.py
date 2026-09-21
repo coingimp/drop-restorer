@@ -134,7 +134,7 @@ def write_site(build):
     # One typography source for the published article and the native WP editors.
     write_theme_assets(theme)
     (theme / 'style.css').write_text('/*\nTheme Name: ' + identity.name +
-                                    '\nVersion: 0.1.9\nTested up to: 7.1\nRequires PHP: 8.0\nText Domain: ' + identity.text_domain + '\n*/\n', encoding='utf-8')
+                                    '\nVersion: 0.1.10\nTested up to: 7.1\nRequires PHP: 8.0\nText Domain: ' + identity.text_domain + '\n*/\n', encoding='utf-8')
     runtime_policy = {key:value for key,value in build.seo_policy.items()
                       if key in ('version','url_style','casino_pending','redirects','widget_id','casino_layout')}
     manifest = {'origin': build.request.origin, 'lang': build.request.lang, 'theme': identity.manifest(),

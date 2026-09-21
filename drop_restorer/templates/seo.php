@@ -28,8 +28,10 @@ add_filter('robots_txt', function($text, $public) {
 }, PHP_INT_MAX, 2);
 add_filter('wp_robots', function($robots) {
     if (dr_page()) {
-        unset($robots['noindex'], $robots['nofollow'], $robots['none']);
-        $robots['index'] = true; $robots['follow'] = true;
+        // A restored page is public regardless of the old archive policy or
+        // the WordPress Reading setting. Keep only the positive directives so
+        // a plugin cannot leave a second conflicting value behind.
+        return array('index' => true, 'follow' => true);
     }
     return $robots;
 }, PHP_INT_MAX);
@@ -38,14 +40,42 @@ add_filter('wpseo_robots', function($robots) {
 }, PHP_INT_MAX);
 function dr_public_plugin_robots($robots) {
     if (dr_page()) {
-        unset($robots['noindex'], $robots['nofollow'], $robots['none']);
-        $robots['index'] = 'index'; $robots['follow'] = 'follow';
+        // SEO plugins use both a string and an array contract. Normalize both
+        // forms rather than assuming associative array keys.
+        return is_string($robots) ? 'index, follow' : (is_array($robots) ? array('index' => 'index', 'follow' => 'follow') : $robots);
     }
     return $robots;
 }
 foreach (array('wpseo_robots_array', 'rank_math/frontend/robots', 'aioseo_robots_meta') as $hook) {
     add_filter($hook, 'dr_public_plugin_robots', PHP_INT_MAX);
 }
+
+// A final head guard catches a plugin that prints its own robot meta tag after
+// the normal WordPress filters. The archive sanitizer handles saved page HTML;
+// this guard handles runtime output on the installed site as well.
+function dr_strip_public_robot_markup($html) {
+    if (!dr_page() || !is_string($html)) { return $html; }
+    $html = preg_replace_callback('/<meta\b[^>]*>/i', function($match) {
+        return preg_match('/\b(?:name|property|http-equiv)\s*=\s*["\']?(?:robots|x-robots-tag|[a-z0-9_-]*bot[a-z0-9_-]*)["\']?/i', $match[0]) ? '' : $match[0];
+    }, $html);
+    $html = preg_replace('/<\/?noindex\b[^>]*>|<!--[\s]*(?:\/?noindex|google(?:off|on)\s*:\s*index)[\s]*-->/i', '', $html);
+    return $html;
+}
+add_action('wp_head', function() {
+    if (dr_page()) {
+        if (function_exists('header_remove')) { header_remove('X-Robots-Tag'); }
+        $GLOBALS['dr_public_head_buffer_level'] = ob_get_level();
+        ob_start('dr_strip_public_robot_markup');
+    }
+}, 0);
+add_action('wp_head', function() {
+    $level = $GLOBALS['dr_public_head_buffer_level'] ?? null;
+    if ($level !== null && ob_get_level() > $level) {
+        if (function_exists('header_remove')) { header_remove('X-Robots-Tag'); }
+        ob_end_flush();
+        unset($GLOBALS['dr_public_head_buffer_level']);
+    }
+}, PHP_INT_MAX);
 
 // Host and path redirects run before the restored-page router and WP guessing.
 add_action('template_redirect', function() {

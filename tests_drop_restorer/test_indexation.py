@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from drop_restorer.core.cleaner import parse_html
-from drop_restorer.core.indexation import open_indexation, robot_tags
+from drop_restorer.core.indexation import indexation_blockers, open_indexation, robot_tags
 from drop_restorer.core.seo_routes import indexable, pending_casino, sitemap, robots, write_staging
 from drop_restorer.core.wordpress import write_site
 from drop_restorer.core.checklist import inspect_site
@@ -17,9 +17,10 @@ class IndexationTests(unittest.TestCase):
     def test_archived_bot_restrictions_and_wrappers_removed_content_kept(self):
         soup = parse_html('''<html><head><meta name="ROBOTS" content="none">
             <meta name="Googlebot" content="noindex"><meta name="YandexBot" content="nofollow">
+            <meta property="robots" content="noindex"><meta name="googlebot-news" content="none">
             <meta http-equiv="X-Robots-Tag" content="noindex"><title>Original title</title>
             <meta name="description" content="Original description"></head><body>
-            <!--noindex--><noindex><p>Keep original text</p></noindex><!--/noindex-->
+            <!--noindex--><!--googleoff: index--><noindex><p>Keep original text</p></noindex><!--/noindex--><!--googleon: index-->
             <a href="/go/brand" rel="nofollow sponsored">Offer</a></body></html>''')
         open_indexation(soup)
         self.assertFalse(list(robot_tags(soup)))
@@ -29,6 +30,17 @@ class IndexationTests(unittest.TestCase):
         self.assertEqual(soup.a['rel'], ['nofollow', 'sponsored'])
         first = str(soup)
         self.assertEqual(first, str(open_indexation(soup)))
+        self.assertFalse(indexation_blockers(soup))
+
+    def test_generated_theme_has_runtime_indexation_guard(self):
+        with tempfile.TemporaryDirectory() as directory:
+            pipeline = Pipeline(Path(directory), client=FixtureArchive(), agent=FixtureAgent())
+            build = pipeline.finish(pipeline.run(request()), 'keep')
+            write_site(build)
+            seo = (build.root / 'theme' / 'seo.php').read_text(encoding='utf-8')
+            self.assertIn("return array('index' => true, 'follow' => true);", seo)
+            self.assertIn('dr_strip_public_robot_markup', seo)
+            self.assertIn("header_remove('X-Robots-Tag')", seo)
 
     def test_legacy_policy_cannot_exclude_any_page(self):
         pages = [SimpleNamespace(route='/', casino=False), SimpleNamespace(route='/casino/', casino=True)]
@@ -66,6 +78,9 @@ class IndexationTests(unittest.TestCase):
             page = build.pages[0]
             path = build.root/'pages'/(page.key+'.html')
             path.write_text(page.html.replace('</head>', '<meta name="googlebot" content="none"></head>'), encoding='utf-8')
+            report = inspect_site(build)
+            self.assertEqual(next(r for r in report['items'] if r['key']=='noindex')['status'], 'fail')
+            path.write_text(page.html.replace('</head>', '<!--googleoff: index--></head>'), encoding='utf-8')
             report = inspect_site(build)
             self.assertEqual(next(r for r in report['items'] if r['key']=='noindex')['status'], 'fail')
 
