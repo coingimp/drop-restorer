@@ -7,7 +7,7 @@ from bs4 import Comment
 # element instead of trying to merge its values: an archived ``index,follow``
 # tag can still be contradicted by a second tag injected by the donor site.
 # A clean head with no robot meta tag is the least ambiguous output.
-ROBOT_META_NAME = re.compile(r'^(?:robots|x-robots-tag|[a-z0-9_-]*bot[a-z0-9_-]*)$', re.I)
+ROBOT_META_NAME = re.compile(r'^(?:x-robots-tag|[a-z0-9:_-]*robots[a-z0-9:_-]*|[a-z0-9_-]*bot[a-z0-9_-]*)$', re.I)
 INDEXATION_COMMENT = re.compile(r'(?:/?noindex|google(?:off|on)\s*:\s*index)', re.I)
 
 

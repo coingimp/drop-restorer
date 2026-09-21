@@ -17,7 +17,7 @@ class IndexationTests(unittest.TestCase):
     def test_archived_bot_restrictions_and_wrappers_removed_content_kept(self):
         soup = parse_html('''<html><head><meta name="ROBOTS" content="none">
             <meta name="Googlebot" content="noindex"><meta name="YandexBot" content="nofollow">
-            <meta property="robots" content="noindex"><meta name="googlebot-news" content="none">
+            <meta property="robots" content="noindex"><meta property="og:robots" content="noindex"><meta name="googlebot-news" content="none">
             <meta http-equiv="X-Robots-Tag" content="noindex"><title>Original title</title>
             <meta name="description" content="Original description"></head><body>
             <!--noindex--><!--googleoff: index--><noindex><p>Keep original text</p></noindex><!--/noindex--><!--googleon: index-->

@@ -56,7 +56,7 @@ foreach (array('wpseo_robots_array', 'rank_math/frontend/robots', 'aioseo_robots
 function dr_strip_public_robot_markup($html) {
     if (!dr_page() || !is_string($html)) { return $html; }
     $html = preg_replace_callback('/<meta\b[^>]*>/i', function($match) {
-        return preg_match('/\b(?:name|property|http-equiv)\s*=\s*["\']?(?:robots|x-robots-tag|[a-z0-9_-]*bot[a-z0-9_-]*)["\']?/i', $match[0]) ? '' : $match[0];
+        return preg_match('/\b(?:name|property|http-equiv)\s*=\s*["\']?(?:x-robots-tag|[a-z0-9:_-]*robots[a-z0-9:_-]*|[a-z0-9_-]*bot[a-z0-9_-]*)["\']?/i', $match[0]) ? '' : $match[0];
     }, $html);
     $html = preg_replace('/<\/?noindex\b[^>]*>|<!--[\s]*(?:\/?noindex|google(?:off|on)\s*:\s*index)[\s]*-->/i', '', $html);
     return $html;
