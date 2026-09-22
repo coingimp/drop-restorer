@@ -84,7 +84,7 @@ body.dr-casino-page .dr-casino-content {{
   box-sizing: border-box !important; width: 100% !important; max-width: {content} !important; margin-left: auto !important; margin-right: auto !important;
 }}
 body.dr-casino-page .dr-legacy-layout-table {{ box-sizing: border-box; width: 100% !important; max-width: 100% !important; }}
-/* Keep the donor width on old table shells on desktop.  The previous global
+/* Keep the donor width on legacy table shells on desktop.  The previous global
    width:100% rule expanded an 870px archive shell to the viewport and left a
    large empty coloured band around the casino article. */
 body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table {{ width: auto !important; max-width: 100% !important; margin-left: auto !important; margin-right: auto !important; }}
