@@ -66,6 +66,7 @@ class CasinoLayoutTests(unittest.TestCase):
         self.assertIn('.dr-casino-content-shell', css)
         self.assertIn('width: 100% !important', css)
         self.assertIn('.dr-casino-content-shell > tbody > tr > td.dr-casino-content', css)
+        self.assertIn('background-size: 100% 100% !important', css)
         self.assertIn('dr-casino-content-shell{width:100%!important', css.replace(' ', ''))
 
 
