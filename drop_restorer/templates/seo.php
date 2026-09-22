@@ -78,6 +78,8 @@ add_action('wp_head', function() {
 }, PHP_INT_MAX);
 
 // Host and path redirects run before the restored-page router and WP guessing.
+// Route matching is manifest-based so a stale rewrite_rules option cannot turn
+// a valid /casino/<slug>/ request into the package 404 page.
 add_action('template_redirect', function() {
     if (!dr_seo_policy() || is_admin() || wp_doing_ajax() || is_preview()) { return; }
     $request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
@@ -86,10 +88,13 @@ add_action('template_redirect', function() {
     $policy = dr_seo_policy(); $target = '';
     if (isset($policy['redirects'][$request])) { $target = $policy['redirects'][$request]; }
     if (!$target && isset($policy['redirects'][$path])) { $target = $policy['redirects'][$path]; }
-    $selected = false;
+    $matched_key = dr_route_key_for_request($request);
+    $selected = $matched_key !== null;
+    if ($matched_key !== null && isset(dr_site()['pages'][$matched_key])
+        && !dr_route_request_is_canonical($request, dr_site()['pages'][$matched_key])) {
+        $target = dr_site()['pages'][$matched_key]['route'];
+    }
     foreach (dr_site()['pages'] as $key => $page) {
-        if ($request === $page['route']) { $selected = true; }
-        if ($path === $page['route'] && $request !== $path) { $target = $page['route']; }
         if (isset($_GET['page_id']) && (int)$_GET['page_id'] > 0 && get_post_meta((int)$_GET['page_id'], '_dr_key', true) === $key) { $target = $page['route']; }
     }
     $desired = dr_site()['origin']; $runtime_host = wp_parse_url(home_url(), PHP_URL_HOST);

@@ -298,6 +298,8 @@ class DR_Menu_Walker extends Walker_Nav_Menu {
 }
 
 // Only imported pages owned by this package participate in archive routing.
+// SEO host/canonical redirects run first; the route-aware guard recognizes the
+// same request even before rewrite rules have been flushed.
 add_action('template_redirect', function() {
     if (is_admin() || is_feed() || is_preview() || wp_doing_ajax()) { return; }
     $request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
@@ -323,7 +325,7 @@ add_action('template_redirect', function() {
     remove_action('template_redirect', 'redirect_canonical');
     include get_template_directory() . ($page['casino'] ? '/casino-page.php' : '/page-template.php');
     exit;
-}, -100);
+}, -10);
 
 function dr_canonical($url = '') {
     $page = dr_page();
