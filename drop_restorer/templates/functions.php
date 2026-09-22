@@ -51,7 +51,7 @@ function dr_casino_layout_css() {
     $content = $layout['content_width_px'] ? $layout['content_width_px'].'px' : 'none';
     $table = $layout['table_width_px'] ? $layout['table_width_px'].'px' : '100%';
     $columns = array('logo'=>'.casino-row__logo','bonus'=>'.casino-row__bonus','characteristics'=>'.casino-row__characteristics','rating'=>'.casino-row__rating','button'=>'.casino-row__button');
-    $css = 'body.dr-casino-page .dr-casino-content{box-sizing:border-box!important;width:100%!important;max-width:'.$content.'!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page .dr-legacy-layout-table{box-sizing:border-box;width:100%!important;max-width:100%!important;}'
+    $css = 'body.dr-casino-page .dr-casino-content{box-sizing:border-box!important;width:100%!important;max-width:'.$content.'!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page .dr-legacy-layout-table{box-sizing:border-box;width:100%!important;max-width:100%!important;}body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table{width:auto!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-legacy-table-casino .dr-casino-content{width:100%!important;max-width:100%!important;}'
          . 'body.dr-casino-page .dr-casino-content .dr-casino-table{--dr-casino-table-width:'.$table.';--dr-offer-row-height:'.$layout['row_height_px'].'px;--dr-casino-cell-padding:'.$layout['cell_padding_px'].'px;}'
          . 'body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr{min-height:var(--dr-offer-row-height);}'
          . 'body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr td{padding-top:var(--dr-casino-cell-padding)!important;padding-bottom:var(--dr-casino-cell-padding)!important;}';
@@ -62,7 +62,7 @@ function dr_casino_layout_css() {
     foreach ($columns as $key => $selector) {
         if ($layout['cell_widths_px'][$key]) { $mobile .= 'body.dr-casino-page .dr-casino-content .dr-casino-table '.$selector.'{width:auto!important;}'; }
     }
-    return '<style id="dr-casino-layout">'.$css.'@media(max-width:768px){body.dr-casino-page .dr-casino-content{max-width:100%!important;}body.dr-casino-page .dr-casino-content .dr-casino-table{width:100%!important;}'.$mobile.'}</style>';
+    return '<style id="dr-casino-layout">'.$css.'@media(max-width:768px){body.dr-casino-page .dr-casino-content{max-width:100%!important;}body.dr-casino-page .dr-casino-content .dr-casino-table{width:100%!important;}body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table{width:100%!important;max-width:100%!important;}'.$mobile.'}</style>';
 }
 function dr_has_seo_plugin() {
     return defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION') || defined('AIOSEO_VERSION');
@@ -139,6 +139,26 @@ function dr_prepare_routing_setup() {
 add_action('after_switch_theme', 'dr_prepare_routing_setup', 20);
 add_action('import_end', 'dr_prepare_routing_setup', 20);
 add_action('admin_init', 'dr_setup_routing');
+// Register exact package routes before WordPress builds its rewrite rules.
+// Casino pages deliberately keep the visible ``/casino/article/`` path while
+// their imported WP pages use a leaf slug.  Without an explicit rule Apache
+// can hand the nested path to WP as an unresolved page and the result is a
+// front-end 404 even though the package manifest contains the page.
+add_filter('query_vars', function($vars) {
+    $vars[] = 'dr_restored_key';
+    return $vars;
+});
+add_action('init', function() {
+    foreach ((array) (dr_site()['pages'] ?? array()) as $key => $page) {
+        $route = (string) ($page['route'] ?? '');
+        $path = wp_parse_url($route, PHP_URL_PATH);
+        if (!$path || $path === '/' || strpos($route, '?') !== false) { continue; }
+        $pattern = trim(rawurldecode($path), '/');
+        if ($pattern === '') { continue; }
+        add_rewrite_rule('^' . preg_quote($pattern, '#') . '/?$',
+                         'index.php?dr_restored_key=' . rawurlencode((string) $key), 'top');
+    }
+});
 add_action('admin_notices', function() {
     if (!current_user_can('manage_options') || (string) get_option('permalink_structure') !== '') { return; }
     echo '<div class="notice notice-error"><p>Тема сайта: режим постоянных ссылок Plain несовместим с адресами страниц и /go/. '
@@ -166,9 +186,11 @@ add_action('template_redirect', function() {
     $path = strtok($request, '?');
     $routes = dr_site()['pages'];
     uasort($routes, function($a, $b) { return (int) (strpos($a['route'], '?') === false) - (int) (strpos($b['route'], '?') === false); });
+    $rewritten_key = sanitize_text_field((string) get_query_var('dr_restored_key'));
     foreach ($routes as $key => $page) {
         $route = $page['route'];
-        $matches = strpos($route, '?') !== false ? $request === $route : rawurldecode($path) === rawurldecode($route);
+        $matches = $rewritten_key !== '' ? hash_equals((string) $key, $rewritten_key)
+            : (strpos($route, '?') !== false ? $request === $route : rawurldecode($path) === rawurldecode($route));
         if (!$matches) { continue; }
         $posts = get_posts(array('post_type' => 'page', 'post_status' => 'publish', 'meta_key' => '_dr_key', 'meta_value' => $key, 'numberposts' => 2));
         if (count($posts) !== 1) { return; }

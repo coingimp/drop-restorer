@@ -84,6 +84,11 @@ body.dr-casino-page .dr-casino-content {{
   box-sizing: border-box !important; width: 100% !important; max-width: {content} !important; margin-left: auto !important; margin-right: auto !important;
 }}
 body.dr-casino-page .dr-legacy-layout-table {{ box-sizing: border-box; width: 100% !important; max-width: 100% !important; }}
+/* Keep the donor width on old table shells on desktop.  The previous global
+   width:100% rule expanded an 870px archive shell to the viewport and left a
+   large empty coloured band around the casino article. */
+body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table {{ width: auto !important; max-width: 100% !important; margin-left: auto !important; margin-right: auto !important; }}
+body.dr-casino-page.dr-legacy-table-casino .dr-casino-content {{ width: 100% !important; max-width: 100% !important; }}
 body.dr-casino-page .dr-casino-content > #dr-editor-content, body.dr-casino-page .dr-casino-content > .dr-article {{ box-sizing: border-box; width: 100%; max-width: 100%; }}
 body.dr-casino-page .dr-casino-content .dr-casino-table {{ --dr-casino-table-width: {table}; --dr-offer-row-height: {row}; --dr-casino-cell-padding: {pad}; box-sizing: border-box; width: min(100%, var(--dr-casino-table-width)) !important; max-width: 100% !important; margin-left: auto !important; margin-right: auto !important; }}
 body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr {{ min-height: var(--dr-offer-row-height); }}
@@ -109,7 +114,7 @@ body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr t
   }}
 }}
 {columns}
-@media (max-width: 768px) {{ body.dr-casino-page .dr-casino-content {{ max-width: 100% !important; }} body.dr-casino-page .dr-casino-content .dr-casino-table {{ width: 100% !important; }} {mobile_columns} }}
+@media (max-width: 768px) {{ body.dr-casino-page .dr-casino-content {{ max-width: 100% !important; }} body.dr-casino-page .dr-casino-content .dr-casino-table {{ width: 100% !important; }} body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table {{ width: 100% !important; max-width: 100% !important; }} {mobile_columns} }}
 </style>
 """
 

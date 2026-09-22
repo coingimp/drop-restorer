@@ -90,6 +90,48 @@ class NavigationTests(unittest.TestCase):
         self.assertIn('body.dr-legacy-sidebar-navigation :is(#wrapper,.dr-legacy-sidebar-shell)', css)
         self.assertIn('.dr-navigation[data-dr-layout="legacy-sidebar"].dr-open > .dr-menu', css)
 
+    def test_graphical_table_menu_is_replaced_in_original_banner_strip(self):
+        soup = parse_html('''<body><table width="870"><tr><td><img src="banner.jpg"></td></tr>
+          <tr><td height="23" background="grafik/bck_leiste_navi.gif"><div id="FWTableContainer1">
+          <table width="876"><tr><td><img src="grafik/Navigation/home.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/about.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/contact.jpg" width="146" height="18"></td></tr></table>
+          </div></td></tr><tr><td><table><tr><td><h1>Article</h1>
+          <p>Archived content long enough to identify the main article region.</p></td></tr></table></td></tr></table></body>''')
+        clean(soup, 'de-DE', [])
+        navigation(soup, self.pages, self.request)
+        menu = soup.select_one('td[background*="bck_leiste_navi"] > nav.dr-navigation')
+        self.assertIsNotNone(menu)
+        self.assertEqual(menu.get('data-dr-placement'), 'legacy-table-menu')
+        self.assertEqual(menu.get('data-dr-layout'), 'legacy-table')
+        self.assertIsNone(soup.select_one('[id^="FWTableContainer"]'))
+        self.assertEqual(len(soup.select('.dr-navigation')), 1)
+        self.assertIn('dr-legacy-table-layout', soup.body.get('class', []))
+        self.assertFalse(primary_menu_issues(soup))
+
+    def test_graphical_table_menu_has_compact_responsive_styles(self):
+        css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
+        self.assertIn('.dr-navigation[data-dr-layout="legacy-table"]', css)
+        self.assertIn('body.dr-casino-page.dr-legacy-table-casino',
+                      (Path(__file__).parents[1] / 'drop_restorer' / 'core' / 'casino_layout.py').read_text(encoding='utf-8'))
+
+    def test_graphical_table_casino_keeps_article_cell_background(self):
+        source = parse_html('''<body><table width="870"><tr><td><img src="banner.jpg"></td></tr>
+          <tr><td height="23" background="grafik/bck_leiste_navi.gif"><div id="FWTableContainer1">
+          <table width="876"><tr><td><img src="grafik/Navigation/home.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/about.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/contact.jpg" width="146" height="18"></td></tr></table>
+          </div></td></tr><tr><td><table width="870"><tr>
+          <td width="135">Left</td><td width="585" background="grafik/bck_main.gif"><p>'''
+          + 'Archived article text ' * 20 + '''</p></td><td width="135">Right</td>
+          </tr></table></td></tr></table></body>''')
+        clean(source, 'de-DE', [])
+        result = casino_shell(source, 'Casino rating')
+        navigation(result, self.pages, self.request)
+        article = result.select_one('.dr-casino-content')
+        self.assertEqual(article.get('background'), 'grafik/bck_main.gif')
+        self.assertIsNotNone(result.select_one('td[background*="bck_leiste_navi"] .dr-navigation'))
+
     def test_legacy_vertical_id_menu_wins_over_generated_fallback(self):
         soup = parse_html('''<body><nav class="dr-navigation" aria-label="Main navigation" data-dr-placement="header-fallback">
           <ul id="dr-primary-menu"><li class="dr-casino">Casino</li></ul></nav><div id="main"><div id="text">

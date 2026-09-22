@@ -19,6 +19,54 @@ LEGACY_LEFT_COLUMN = ('#left', '#leftcol', '#left-column', '.leftcol', '.left-co
 LEGACY_CONTENT_COLUMN = ('#content', '#content-column', '#main-content')
 
 
+def legacy_table_primary(soup):
+    """Find a graphical table menu slot from pre-HTML5/Dreamweaver shells.
+
+    A number of archived sites have no usable ``nav`` or list at all: the
+    menu is a row of image buttons inside a table cell whose background is a
+    narrow navigation strip.  Treat that cell as the primary-menu host so the
+    generated accessible menu replaces the obsolete image/JS controls in the
+    same visual location.  Detection is structural and deliberately avoids a
+    hostname or a single asset filename dependency.
+
+    Returns ``(existing_menu, host)``.  ``existing_menu`` is populated when a
+    previous repair already inserted the generated menu, which makes the
+    navigation pass idempotent.
+    """
+    existing = soup.select_one('nav.dr-navigation[data-dr-placement="legacy-table-menu"]')
+    if existing is not None:
+        return existing, existing.find_parent(['td', 'div', 'section'])
+    candidates = []
+    for host in soup.find_all(['td', 'div', 'section']):
+        background = ' '.join((host.get('background', ''), host.get('style', '')))
+        fw = host.select_one('[id^="FWTableContainer"], [id*="TableContainer"]')
+        nested_table = host.find('table', recursive=False)
+        if fw is None and nested_table is None:
+            continue
+        images = host.select('img')
+        links = host.select('a[href]')
+        image_sources = ' '.join(img.get('src', '') for img in images)
+        navigation_hint = bool(re.search(r'(?:navigation|nav|menu|bck[_-]?leiste[_-]?navi)', background + ' ' + image_sources, re.I))
+        narrow_strip = host.name == 'td' and 12 <= _numeric_dimension(host.get('height')) <= 80
+        if not navigation_hint and not (fw is not None and narrow_strip):
+            continue
+        # Require several compact button images or links.  This prevents a
+        # regular content table with a decorative background from becoming a
+        # menu host.
+        compact_images = [img for img in images
+                          if 0 < _numeric_dimension(img.get('width')) <= 320
+                          and 0 < _numeric_dimension(img.get('height')) <= 80]
+        if len(compact_images) < 3 and len(links) < 3:
+            continue
+        score = (100 if fw is not None else 0) + (40 if navigation_hint else 0)
+        score += min(len(compact_images), 12) * 4 + min(len(links), 12) * 2
+        score += 20 if narrow_strip else 0
+        candidates.append((score, -len(list(host.parents)), host))
+    if not candidates:
+        return None, None
+    return None, max(candidates, key=lambda row: row[:2])[2]
+
+
 def _numeric_dimension(value):
     match = re.search(r'\d+', str(value or ''))
     return int(match.group()) if match else 0

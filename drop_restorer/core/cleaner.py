@@ -187,10 +187,35 @@ def navigation(soup, pages: list[Page], request: RestoreRequest):
     # A site's primary navigation is distinct from sidebars, mega-menu columns
     # and footer lists. Never populate every list with the whole site.
     from .primary_navigation import (HEADER, legacy_dynamic_primary, legacy_flash_primary,
-                                     legacy_sidebar_target, select_primary, secondary_context)
+                                     legacy_sidebar_target, legacy_table_primary, select_primary,
+                                     secondary_context)
     flash_primary, flash_slot, flash_host, flash_order = legacy_flash_primary(soup)
     dynamic_primary, dynamic_donor = legacy_dynamic_primary(soup)
     primary = flash_primary or select_primary(soup)
+    legacy_menu, legacy_host = legacy_table_primary(soup)
+    # Dreamweaver-era image navigation has no semantic menu for
+    # ``select_primary`` to recognise. Replace the obsolete button table in
+    # its original strip below the banner so the generated menu does not jump
+    # to the top of the document and create a duplicate header.
+    if (primary is None or primary.get('data-dr-placement') == 'header-fallback') and legacy_menu is not None:
+        if primary is not None and primary is not legacy_menu:
+            primary.decompose()
+        primary = legacy_menu
+    elif (primary is None or primary.get('data-dr-placement') == 'header-fallback') and legacy_host is not None:
+        if primary is not None:
+            primary.decompose()
+        primary = soup.new_tag('nav', attrs={'aria-label': 'Main navigation',
+                                             'data-dr-placement': 'legacy-table-menu',
+                                             'data-dr-layout': 'legacy-table'})
+        legacy_host.clear()
+        legacy_host.append(primary)
+        shell_tables = [node for node in legacy_host.parents if getattr(node, 'name', None) == 'table']
+        shell_table = shell_tables[-1] if shell_tables else None
+        if shell_table is not None:
+            for table in shell_table.find_all('table'):
+                table['class'] = list(dict.fromkeys([*table.get('class', []), 'dr-legacy-layout-table']))
+            shell_table['class'] = list(dict.fromkeys([*shell_table.get('class', []), 'dr-legacy-width-table']))
+        soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-table-layout']))
     if flash_host is not None and flash_primary is None:
         primary = soup.new_tag('nav', attrs={'aria-label': 'Main navigation',
                                              'data-dr-placement': 'legacy-flash-menu',
@@ -274,6 +299,8 @@ def navigation(soup, pages: list[Page], request: RestoreRequest):
         soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-vertical-navigation']))
     if primary.get('data-dr-layout') == 'legacy-sidebar':
         soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-sidebar-navigation']))
+    if primary.get('data-dr-layout') == 'legacy-table':
+        soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-table-layout']))
     if primary is dynamic_primary or primary.get('data-dr-layout') == 'legacy-dynamic':
         primary['data-dr-layout'] = 'legacy-dynamic'
         soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []),
@@ -444,6 +471,40 @@ def _inferred_article_region(soup, primary):
                                -order, node))
         if candidates:
             return max(candidates, key=lambda item: item[:2])[2]
+    # Dreamweaver shells often have a full-width banner/menu table followed by
+    # a nested three-column table (left rail, 585px article cell, right rail).
+    # The article cell may not have an id or semantic landmark, so use the
+    # same table-menu host to locate the row and preserve its background/width
+    # attributes when generating a casino page.
+    from .primary_navigation import legacy_table_primary
+    _, table_menu = legacy_table_primary(soup)
+    if table_menu is not None:
+        shell_tables = list(table_menu.find_parents('table'))
+        shell_table = shell_tables[-1] if shell_tables else None
+        candidates = []
+        if shell_table is not None:
+            for order, row in enumerate(shell_table.find_all('tr')):
+                cells = row.find_all('td', recursive=False)
+                if len(cells) < 2:
+                    continue
+                for cell_order, node in enumerate(cells):
+                    if node is table_menu or node.find('.dr-navigation'):
+                        continue
+                    text = ' '.join(node.get_text(' ', strip=True).split())
+                    if len(text) < 60:
+                        continue
+                    blocks = len(node.select('p,h1,h2,h3,h4,ul,ol,table,blockquote,img'))
+                    width = _numeric_dimension(node.get('width'))
+                    names = ' '.join([node.get('id', ''), *node.get('class', [])])
+                    hints = bool(re.search(r'(?:content|article|main|text)', names, re.I))
+                    # The narrow news rail can contain many short paragraphs,
+                    # so block count alone would beat the actual article cell.
+                    # Give the broad middle column a decisive structural
+                    # preference while retaining text/content hints.
+                    score = min(len(text), 5000) / 20 + min(blocks, 20) * 5 + hints * 35 + min(width, 900) / 5
+                    candidates.append((score, -order, -cell_order, node))
+        if candidates:
+            return max(candidates, key=lambda item: item[:3])[3]
     # Several early CMS generators used a numbered table template.  The first
     # cell in its fifth table is the stable article slot, while later rows hold
     # a repeated link list and the footer.
