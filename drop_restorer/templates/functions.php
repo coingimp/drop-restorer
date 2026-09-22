@@ -18,6 +18,64 @@ function dr_site() {
     }
     return $site ?: array('pages' => array(), 'lang' => 'en', 'origin' => home_url());
 }
+
+// Resolve package routes from the request itself.  WordPress stores rewrite
+// rules in the database, so a freshly activated theme can receive its first
+// public request before the administrator has visited Settings -> Permalinks
+// (or when .htaccess is not writable).  The resolver keeps the visible
+// /casino/<slug>/ URL independent of that timing and also handles installs in
+// a subdirectory such as https://example.test/wordpress/.
+function dr_request_parts($request = null) {
+    if ($request === null) {
+        $request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
+    }
+    $request = (string) $request;
+    $query_at = strpos($request, '?');
+    $path = $query_at === false ? $request : substr($request, 0, $query_at);
+    $query = $query_at === false ? '' : substr($request, $query_at + 1);
+    $path = rawurldecode($path);
+    if ($path === '') { $path = '/'; }
+    if ($path[0] !== '/') { $path = '/' . $path; }
+    $home_path = rawurldecode((string) wp_parse_url((string) get_option('home'), PHP_URL_PATH));
+    $home_path = $home_path === '' ? '/' : '/' . trim($home_path, '/') . '/';
+    if ($home_path !== '/') {
+        $home_prefix = rtrim($home_path, '/');
+        if ($path === $home_prefix || strpos($path, $home_path) === 0) {
+            $path = substr($path, strlen($home_prefix));
+            if ($path === '') { $path = '/'; }
+            if ($path[0] !== '/') { $path = '/' . $path; }
+        }
+    }
+    return array($path, $query);
+}
+function dr_route_parts($route) {
+    $parsed = wp_parse_url((string) $route);
+    if (!is_array($parsed)) { return array('/', ''); }
+    $path = rawurldecode((string) ($parsed['path'] ?? '/'));
+    if ($path === '') { $path = '/'; }
+    if ($path[0] !== '/') { $path = '/' . $path; }
+    return array($path, (string) ($parsed['query'] ?? ''));
+}
+function dr_route_key_for_request($request = null) {
+    list($path, $query) = dr_request_parts($request);
+    $routes = (array) (dr_site()['pages'] ?? array());
+    // Query routes must win over the ordinary homepage route sharing '/'.
+    uasort($routes, function($a, $b) {
+        return (int) (strpos((string) ($b['route'] ?? ''), '?') !== false)
+             - (int) (strpos((string) ($a['route'] ?? ''), '?') !== false);
+    });
+    foreach ($routes as $key => $page) {
+        list($route_path, $route_query) = dr_route_parts($page['route'] ?? '');
+        $same_path = rtrim($path, '/') === rtrim($route_path, '/') && $path !== '' && $route_path !== '';
+        if ($same_path && $query === $route_query) { return (string) $key; }
+    }
+    return null;
+}
+function dr_route_request_is_canonical($request, $page) {
+    list($path, $query) = dr_request_parts($request);
+    list($route_path, $route_query) = dr_route_parts($page['route'] ?? '');
+    return $path === $route_path && $query === $route_query;
+}
 require_once __DIR__ . '/widget.php';
 require_once __DIR__ . '/seo.php';
 require_once __DIR__ . '/article.php';
@@ -117,7 +175,11 @@ function dr_schedule_routing_setup() {
 add_action('after_switch_theme', 'dr_schedule_routing_setup');
 add_action('import_end', 'dr_schedule_routing_setup');
 function dr_setup_routing() {
-    if (!current_user_can('manage_options') || !get_option('dr_routing_setup_pending')) { return; }
+    if (!get_option('dr_routing_setup_pending')) { return; }
+    // Some importers fire their completion hook before the current user is
+    // fully attached. Keep the marker for the next privileged request rather
+    // than claiming that the rewrite flush succeeded.
+    if (!current_user_can('manage_options') && !did_action('after_switch_theme') && !did_action('import_end')) { return; }
     global $wp_rewrite;
     if ((string) get_option('permalink_structure') === '') {
         $site = dr_site();
@@ -138,7 +200,44 @@ function dr_prepare_routing_setup() {
 }
 add_action('after_switch_theme', 'dr_prepare_routing_setup', 20);
 add_action('import_end', 'dr_prepare_routing_setup', 20);
+// An importer can finish in a front-end request. This one-time fallback
+// flushes rules as soon as a privileged request reaches init; the resolver
+// below still serves the first URL if the server cannot write rules.
+add_action('init', 'dr_setup_routing', 100);
 add_action('admin_init', 'dr_setup_routing');
+
+// The WordPress importer can preserve a draft/private status from an earlier
+// retry.  Package pages are explicitly public, so repair only pages carrying
+// this theme's ownership key and leave every other page untouched. Duplicate
+// or missing keys are reported for the administrator instead of being guessed.
+function dr_restored_page_diagnostics() {
+    $result = array('missing' => array(), 'duplicates' => array(), 'hidden' => array());
+    foreach ((array) (dr_site()['pages'] ?? array()) as $key => $page) {
+        $posts = get_posts(array('post_type' => 'page', 'post_status' => 'any', 'meta_key' => '_dr_key',
+                                  'meta_value' => $key, 'numberposts' => 10));
+        if (!$posts) { $result['missing'][] = $key; continue; }
+        if (count($posts) > 1) { $result['duplicates'][] = $key; continue; }
+        if ((string) $posts[0]->post_status !== 'publish') { $result['hidden'][] = $key; }
+    }
+    return $result;
+}
+function dr_schedule_page_repair() { update_option('dr_page_repair_pending', 1, false); }
+function dr_repair_owned_page_status() {
+    if (!get_option('dr_page_repair_pending') || !current_user_can('manage_options')) { return; }
+    $diagnostics = dr_restored_page_diagnostics();
+    foreach ($diagnostics['hidden'] as $key) {
+        $posts = get_posts(array('post_type' => 'page', 'post_status' => 'any', 'meta_key' => '_dr_key',
+                                  'meta_value' => $key, 'numberposts' => 2));
+        if (count($posts) === 1) { wp_update_post(array('ID' => $posts[0]->ID, 'post_status' => 'publish')); }
+    }
+    $after = dr_restored_page_diagnostics();
+    if (!$after['missing'] && !$after['duplicates'] && !$after['hidden']) { delete_option('dr_page_repair_pending'); }
+}
+add_action('after_switch_theme', 'dr_schedule_page_repair', 5);
+add_action('import_end', 'dr_schedule_page_repair', 5);
+add_action('import_end', 'dr_repair_owned_page_status', 30);
+add_action('init', 'dr_repair_owned_page_status', 101);
+add_action('admin_init', 'dr_repair_owned_page_status');
 // Register exact package routes before WordPress builds its rewrite rules.
 // Casino pages deliberately keep the visible ``/casino/article/`` path while
 // their imported WP pages use a leaf slug.  Without an explicit rule Apache
@@ -159,11 +258,30 @@ add_action('init', function() {
                          'index.php?dr_restored_key=' . rawurlencode((string) $key), 'top');
     }
 });
+// Do not depend on a persisted rewrite_rules option for the first request.
+// WordPress still invokes the theme after its front controller receives a
+// pretty URL, even when the stored rules are stale.
+add_action('parse_request', function($wp) {
+    if (is_admin() || !is_object($wp)) { return; }
+    $key = dr_route_key_for_request();
+    if ($key !== null) { $wp->query_vars['dr_restored_key'] = $key; }
+});
 add_action('admin_notices', function() {
-    if (!current_user_can('manage_options') || (string) get_option('permalink_structure') !== '') { return; }
-    echo '<div class="notice notice-error"><p>Тема сайта: режим постоянных ссылок Plain несовместим с адресами страниц и /go/. '
-        . '<a href="' . esc_url(admin_url('options-permalink.php')) . '">Выберите «Название записи» и сохраните постоянные ссылки</a>. '
-        . 'После этого проверьте казино-страницы на самом домене.</p></div>';
+    if (!current_user_can('manage_options')) { return; }
+    if ((string) get_option('permalink_structure') === '') {
+        echo '<div class="notice notice-error"><p>Тема сайта: режим постоянных ссылок Plain несовместим с адресами страниц и /go/. '
+            . '<a href="' . esc_url(admin_url('options-permalink.php')) . '">Выберите «Название записи» и сохраните постоянные ссылки</a>. '
+            . 'После этого проверьте казино-страницы на самом домене.</p></div>';
+    }
+    $diagnostics = dr_restored_page_diagnostics();
+    if ($diagnostics['missing'] || $diagnostics['duplicates'] || $diagnostics['hidden']) {
+        $parts = array();
+        if ($diagnostics['missing']) { $parts[] = 'не импортированы: ' . count($diagnostics['missing']); }
+        if ($diagnostics['duplicates']) { $parts[] = 'дублируются: ' . count($diagnostics['duplicates']); }
+        if ($diagnostics['hidden']) { $parts[] = 'были скрыты и будут опубликованы повторной проверкой: ' . count($diagnostics['hidden']); }
+        echo '<div class="notice notice-warning"><p>Маршруты восстановленной темы не готовы (' . esc_html(implode('; ', $parts)) . '). '
+            . 'Импортируйте XML из комплекта сборки один раз и обновите эту страницу. Для казино-URL используется формат <code>/casino/&lt;slug&gt;/</code>.</p></div>';
+    }
 });
 class DR_Menu_Walker extends Walker_Nav_Menu {
     public function start_lvl(&$output, $depth = 0, $args = null) { $output .= '<ul class="dr-submenu">'; }
@@ -183,28 +301,29 @@ class DR_Menu_Walker extends Walker_Nav_Menu {
 add_action('template_redirect', function() {
     if (is_admin() || is_feed() || is_preview() || wp_doing_ajax()) { return; }
     $request = isset($_SERVER['REQUEST_URI']) ? wp_unslash($_SERVER['REQUEST_URI']) : '/';
-    $path = strtok($request, '?');
-    $routes = dr_site()['pages'];
-    uasort($routes, function($a, $b) { return (int) (strpos($a['route'], '?') === false) - (int) (strpos($b['route'], '?') === false); });
-    $rewritten_key = sanitize_text_field((string) get_query_var('dr_restored_key'));
-    foreach ($routes as $key => $page) {
-        $route = $page['route'];
-        $matches = $rewritten_key !== '' ? hash_equals((string) $key, $rewritten_key)
-            : (strpos($route, '?') !== false ? $request === $route : rawurldecode($path) === rawurldecode($route));
-        if (!$matches) { continue; }
-        $posts = get_posts(array('post_type' => 'page', 'post_status' => 'publish', 'meta_key' => '_dr_key', 'meta_value' => $key, 'numberposts' => 2));
-        if (count($posts) !== 1) { return; }
-        $GLOBALS['dr_current_key'] = $key;
-        $GLOBALS['wp_query'] = new WP_Query(array('page_id' => $posts[0]->ID));
-        $GLOBALS['wp_the_query'] = $GLOBALS['wp_query'];
-        status_header(200);
-        // Remove an earlier PHP robots header once an owned public page is resolved.
-        header_remove('X-Robots-Tag');
-        remove_action('template_redirect', 'redirect_canonical');
-        include get_template_directory() . ($page['casino'] ? '/casino-page.php' : '/page-template.php');
+    $key = dr_route_key_for_request($request);
+    if ($key === null) { return; }
+    $page = dr_site()['pages'][$key] ?? null;
+    if (!is_array($page)) { return; }
+    if (!dr_route_request_is_canonical($request, $page)) {
+        wp_safe_redirect(home_url($page['route']), 301, 'Restored route canonical');
         exit;
     }
-}, -10);
+    $posts = get_posts(array('post_type' => 'page', 'post_status' => 'publish', 'meta_key' => '_dr_key', 'meta_value' => $key, 'numberposts' => 2));
+    // Let the SEO guard produce the designed 404 when the XML was not imported
+    // or a package page was deliberately removed; never render an unrelated WP
+    // page just because its URL happens to match an archive route.
+    if (count($posts) !== 1) { return; }
+    $GLOBALS['dr_current_key'] = $key;
+    $GLOBALS['wp_query'] = new WP_Query(array('page_id' => $posts[0]->ID));
+    $GLOBALS['wp_the_query'] = $GLOBALS['wp_query'];
+    status_header(200);
+    // Remove an earlier PHP robots header once an owned public page is resolved.
+    header_remove('X-Robots-Tag');
+    remove_action('template_redirect', 'redirect_canonical');
+    include get_template_directory() . ($page['casino'] ? '/casino-page.php' : '/page-template.php');
+    exit;
+}, -100);
 
 function dr_canonical($url = '') {
     $page = dr_page();

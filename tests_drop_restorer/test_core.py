@@ -268,9 +268,22 @@ class PipelineTests(unittest.TestCase):
                 self.assertNotIn('/', post_name)
             else:
                 self.assertIn('<main>', item.findtext('content:encoded', namespaces=NS))
+            self.assertEqual(item.findtext('wp:status', namespaces=NS), 'publish')
             self.assertEqual(meta['_dr_route'], page.route)
         menus = [item for item in tree.findall('./channel/item') if item.findtext('wp:post_type', namespaces=NS) == 'nav_menu_item']
         self.assertEqual(len(menus), 6)
+
+    def test_theme_routes_survive_first_request_before_rewrite_flush(self):
+        functions = (self.build.root / 'theme' / 'functions.php').read_text(encoding='utf-8')
+        self.assertIn("add_action('parse_request'", functions)
+        self.assertIn('function dr_route_key_for_request', functions)
+        self.assertIn('function dr_route_request_is_canonical', functions)
+        self.assertIn("}, -100);", functions)
+        self.assertIn("add_action('init', 'dr_setup_routing', 100);", functions)
+        self.assertLess(functions.index("}, -100);"), functions.index("function dr_canonical"))
+        seo = (self.build.root / 'theme' / 'seo.php').read_text(encoding='utf-8')
+        self.assertIn("add_action('template_redirect', function()", seo)
+        self.assertIn("}, -30);", seo)
 
     def test_packaging_requires_current_explicit_approval(self):
         target = self.build.root / 'synthetic-development-test.zip'
