@@ -411,6 +411,23 @@ class NavigationTests(unittest.TestCase):
         self.assertTrue(soup.select('.dr-legacy-layout-table'))
         self.assertFalse(primary_menu_issues(soup))
 
+    def test_graphical_table_casino_expands_content_shell_after_sidebars_are_removed(self):
+        source = parse_html('''<body><table width="870"><tr><td><img width="870" height="100"></td></tr>
+          <tr><td><nav class="dr-navigation" data-dr-placement="legacy-table-menu"><a href="/">Home</a>
+          <a href="/about/">About</a></nav></td></tr>
+          <tr><td><table width="870"><tr>
+          <td width="135">Old left rail</td><td id="content" role="main" width="585"><h1>Archived heading</h1>
+          <p>This is the original article content and is long enough to identify the centre cell.</p></td>
+          <td width="135">Old right rail</td></tr></table></td></tr><tr><td>Footer</td></tr></table></body>''')
+        result = casino_shell(source, 'Casino rating')
+        article = result.select_one('.dr-casino-content')
+        shell = result.select_one('.dr-casino-content-shell')
+        self.assertIsNotNone(shell)
+        self.assertIs(article.find_parent('table'), shell)
+        self.assertNotIn('width', article.attrs)
+        row = article.find_parent('tr')
+        self.assertEqual(len(row.find_all('td', recursive=False)), 1)
+
     def test_shell_audit_detects_missing_legacy_landmarks(self):
         source = parse_html('<div id="ja-header">Banner</div><div id="ja-mainnav">Menu</div><div id="ja-footer">Footer</div>')
         broken = parse_html('<main class="dr-casino-content"><h1>Casino</h1><div id="dr-editor-content"></div></main>')

@@ -61,6 +61,13 @@ class CasinoLayoutTests(unittest.TestCase):
         self.assertIn('flex: 1 1 auto !important', css)
         self.assertIn('width: auto !important', css)
 
+    def test_legacy_table_content_shell_fills_donor_width_for_offer_table(self):
+        css = css_for_layout(default_layout())
+        self.assertIn('.dr-casino-content-shell', css)
+        self.assertIn('width: 100% !important', css)
+        self.assertIn('.dr-casino-content-shell > tbody > tr > td.dr-casino-content', css)
+        self.assertIn('dr-casino-content-shell{width:100%!important', css.replace(' ', ''))
+
 
 if __name__ == '__main__':
     unittest.main()

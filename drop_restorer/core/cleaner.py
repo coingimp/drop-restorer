@@ -556,6 +556,16 @@ def _remove_legacy_table_sidebars(soup, main, primary):
     legacy_menu, legacy_host = legacy_table_primary(soup)
     if primary is None and legacy_menu is None and legacy_host is None:
         return
+    # Once the decorative rails are removed, the article cell must no longer
+    # keep the donor's narrow column width.  Mark its nearest table as the
+    # reusable content shell so the casino layout CSS can expand it to the
+    # full archive shell width while leaving the banner/menu/footer intact.
+    content_shell = main.find_parent('table')
+    if content_shell is not None:
+        content_shell['class'] = list(dict.fromkeys([
+            *content_shell.get('class', []), 'dr-casino-content-shell'
+        ]))
+    main.attrs.pop('width', None)
     row = main.find_parent('tr')
     cells = row.find_all('td', recursive=False) if row is not None else []
     if len(cells) < 2:
