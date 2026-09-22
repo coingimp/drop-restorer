@@ -112,6 +112,7 @@ class NavigationTests(unittest.TestCase):
     def test_graphical_table_menu_has_compact_responsive_styles(self):
         css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
         self.assertIn('.dr-navigation[data-dr-layout="legacy-table"]', css)
+        self.assertIn('background:#0086c6!important', css)
         self.assertIn('body.dr-casino-page.dr-legacy-table-casino',
                       (Path(__file__).parents[1] / 'drop_restorer' / 'core' / 'casino_layout.py').read_text(encoding='utf-8'))
 
@@ -131,6 +132,27 @@ class NavigationTests(unittest.TestCase):
         article = result.select_one('.dr-casino-content')
         self.assertEqual(article.get('background'), 'grafik/bck_main.gif')
         self.assertIsNotNone(result.select_one('td[background*="bck_leiste_navi"] .dr-navigation'))
+
+    def test_graphical_table_casino_removes_adjacent_sidebars(self):
+        source = parse_html('''<body><table width="870"><tr><td><img src="banner.jpg"></td></tr>
+          <tr><td height="23" background="grafik/bck_leiste_navi.gif"><div id="FWTableContainer1">
+          <table width="876"><tr><td><img src="grafik/Navigation/home.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/about.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/contact.jpg" width="146" height="18"></td></tr>
+          </table></div></td></tr><tr><td><table width="870"><tr>
+          <td width="135" bgcolor="#0086C6"><object width="135" height="350"></object></td>
+          <td width="585" background="grafik/bck_main.gif"><p>'''
+          + 'Archived article text ' * 20 + '''</p></td>
+          <td width="135" background="grafik/bck_leiste_news.jpg"><p>News rail</p></td>
+          </tr></table></td></tr><tr><td>Footer</td></tr></table></body>''')
+        result = casino_shell(source, 'Casino rating')
+        navigation(result, self.pages, self.request)
+        article = result.select_one('.dr-casino-content')
+        self.assertIsNotNone(article)
+        row = article.find_parent('tr')
+        self.assertEqual(row.find_all('td', recursive=False), [article])
+        self.assertIsNotNone(result.select_one('td[background*="bck_leiste_navi"] .dr-navigation'))
+        self.assertIsNotNone(result.find(string=lambda value: value and 'Footer' in value))
 
     def test_legacy_vertical_id_menu_wins_over_generated_fallback(self):
         soup = parse_html('''<body><nav class="dr-navigation" aria-label="Main navigation" data-dr-placement="header-fallback">

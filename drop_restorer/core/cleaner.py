@@ -539,6 +539,35 @@ def _inferred_article_region(soup, primary):
     return max(candidates, key=lambda row: row[:3])[3] if candidates else None
 
 
+def _remove_legacy_table_sidebars(soup, main, primary):
+    """Drop decorative side columns from table-based casino shells.
+
+    The recovered article should keep the site's primary menu and footer, but
+    the donor's narrow news/Flash rails are unrelated to the casino article.
+    Remove only direct sibling cells of the selected article cell and only
+    when a separate primary-menu source exists.  This protects true sidebar
+    menu layouts that have no independent top navigation.
+    """
+    if main is None or main.name != 'td' or soup.body is None:
+        return
+    if 'dr-legacy-table-casino' not in soup.body.get('class', []):
+        return
+    from .primary_navigation import legacy_table_primary
+    legacy_menu, legacy_host = legacy_table_primary(soup)
+    if primary is None and legacy_menu is None and legacy_host is None:
+        return
+    row = main.find_parent('tr')
+    cells = row.find_all('td', recursive=False) if row is not None else []
+    if len(cells) < 2:
+        return
+    for cell in list(cells):
+        if cell is main:
+            continue
+        if cell.find('.dr-navigation') or (primary is not None and (cell is primary or primary in cell.descendants)):
+            continue
+        cell.decompose()
+
+
 def casino_shell(source: BeautifulSoup, title: str) -> BeautifulSoup:
     soup = deepcopy(source)
     # Older CMS themes use divs rather than HTML5 landmarks. Retain the
@@ -563,6 +592,7 @@ def casino_shell(source: BeautifulSoup, title: str) -> BeautifulSoup:
             layout_tables.extend(primary.find_parents('table'))
         for table in layout_tables:
             table['class'] = list(dict.fromkeys([*table.get('class', []), 'dr-legacy-layout-table']))
+        _remove_legacy_table_sidebars(soup, main, primary)
     if protected_shell is None:
         main.clear()
     else:
