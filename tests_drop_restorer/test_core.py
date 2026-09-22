@@ -366,6 +366,21 @@ class PipelineTests(unittest.TestCase):
         write_site(self.build)
         self.assertIsNone(self.build.approved_digest)
 
+    def test_theme_export_repairs_stale_graphical_menu_checkpoint(self):
+        page = self.build.pages[0]
+        page.html = '''<body><table width="870"><tr><td><img src="banner.jpg"></td></tr>
+          <tr><td height="23" background="grafik/bck_leiste_navi.gif"><div id="FWTableContainer1">
+          <table width="876"><tr><td><img src="grafik/Navigation/home.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/about.jpg" width="146" height="18"></td>
+          <td><img src="grafik/Navigation/contact.jpg" width="146" height="18"></td></tr></table>
+          </div></td></tr><tr><td><main><p>Archived content remains editable.</p></main></td></tr></table></body>'''
+        write_site(self.build)
+        exported = BeautifulSoup((self.build.root / 'pages' / (page.key + '.html')).read_text(encoding='utf-8'), 'lxml')
+        self.assertEqual(len(exported.select('nav.dr-navigation')), 1)
+        self.assertIsNotNone(exported.select_one('td[background*="bck_leiste_navi"] > nav.dr-navigation'))
+        self.assertIsNone(exported.select_one('[id^="FWTableContainer"]'))
+        self.assertFalse(exported.select_one('nav.dr-navigation[data-dr-placement="header-fallback"]'))
+
     def test_query_page_takes_precedence_over_homepage(self):
         self.build.pages[1].route = '/?section=about'
         server = PreviewServer(self.build)

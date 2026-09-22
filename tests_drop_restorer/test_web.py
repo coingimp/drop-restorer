@@ -121,6 +121,18 @@ class WebTests(unittest.TestCase):
         self.assertIn("frame-ancestors 'none'", response.headers['Content-Security-Policy'])
         self.assertNotIn('Access-Control-Allow-Origin', response.headers)
 
+    def test_panel_token_survives_service_restart(self):
+        token = self.state.token
+        token_file = self.state.root / 'web-token.json'
+        self.assertTrue(token_file.is_file())
+        self.state.close()
+        restarted = create_app(self.workspace)
+        self.addCleanup(restarted.extensions['workspace'].close)
+        self.assertEqual(restarted.extensions['workspace'].token, token)
+        script = (Path(__file__).resolve().parents[1] / 'drop_restorer/web/static/app.js').read_text(encoding='utf-8')
+        self.assertIn('response.status === 403', script)
+        self.assertIn('Связь с локальным инструментом потеряна', script)
+
     def test_path_traversal_and_unknown_download_are_rejected(self):
         self.assertEqual(self.post('/api/projects/open', {'id':'../../backups'}).status_code, 400)
         self.assertEqual(self.get('/files/missing').status_code, 404)

@@ -52,13 +52,35 @@ def write_json(path, data):
     temporary.replace(path)
 
 
+def load_web_token(root):
+    """Keep the local panel session stable when the service is restarted.
+
+    The panel is bound to localhost and still requires this token for every
+    API request.  Persisting it prevents a running browser tab from becoming
+    invalid merely because the scheduled service was restarted.  If the state
+    directory is read-only, fall back to an in-memory token; the client-side
+    refresh path can still recover in that case.
+    """
+    path = root / 'web-token.json'
+    saved = read_json(path, {})
+    token = saved.get('token') if isinstance(saved, dict) else None
+    if isinstance(token, str) and len(token) >= 32:
+        return token
+    token = secrets.token_urlsafe(32)
+    try:
+        write_json(path, {'token': token})
+    except OSError:
+        pass
+    return token
+
+
 class Workspace:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
         self.root = self.workspace / 'var' / 'drop-restorer'
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
-        self.token = secrets.token_urlsafe(32)
+        self.token = load_web_token(self.root)
         self.agents = {}
         self.active_agent = None
         self.build = None

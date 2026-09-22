@@ -8,7 +8,7 @@ from urllib.parse import unquote
 
 from lxml import etree
 
-from .cleaner import parse_html
+from .cleaner import navigation, parse_html
 from .indexation import open_indexation
 from .theme_identity import theme_identity
 
@@ -141,7 +141,14 @@ def write_site(build):
                 'pages': {}, 'seo_policy': runtime_policy, 'article_formatting': 1}
     contents = {}
     for page in build.pages:
-        soup = open_indexation(parse_html(page.html))
+        # A project can be opened and approved after the generator has been
+        # upgraded.  Re-run the deterministic navigation repair at export
+        # time so an older checkpoint cannot package a stale header fallback
+        # beside the donor menu (the common failure on legacy table sites).
+        soup = parse_html(page.html)
+        navigation(soup, build.pages, build.request)
+        page.html = str(soup)
+        soup = open_indexation(soup)
         for node in soup.select('link[href="/assets/drop-restorer.css"]'):
             node['href'] = '/assets/site-navigation.css'
         for node in soup.select('script[src="/assets/drop-restorer.js"]'):

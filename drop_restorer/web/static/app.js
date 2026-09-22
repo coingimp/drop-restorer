@@ -1,16 +1,45 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const token = document.querySelector('meta[name="csrf-token"]').content;
+let token = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const devices = {Desktop:[1920,1080],Tablet:[768,1024],Mobile:[375,812]};
 const titles = {ready:'Тема готова к просмотру',site_review:'Ожидает вашего решения по сайту',metadata_review:'Ожидает выбора метаданных',downloading:'Загрузка не завершена',incomplete:'Незавершённая сборка'};
 let state, lastRevision = -1, selected = '', preview, loaded = false, editing, loading = false, autoCaptured = new Set();
 let openedId = null, agentSettingsLoaded = false, defaultSettingsLoaded = false;
 let projectTimer, projectsLoading=false, projectSignature='', deleteDraft=null;
 
-async function api(path, values) {
-  const response = await fetch('/api/' + path, {method:values === undefined ? 'GET':'POST', headers:{'X-DropRestorer-Token':token,...(values === undefined ? {}:{'Content-Type':'application/json'})}, ...(values === undefined ? {}:{body:JSON.stringify(values)})});
-  const result = await response.json();
+async function refreshToken() {
+  let response;
+  try {
+    response = await fetch('/?token_refresh=' + Date.now(), {cache:'no-store', headers:{'Cache-Control':'no-cache'}});
+  } catch (error) {
+    throw new Error('Связь с локальным инструментом потеряна. Проверьте http://127.0.0.1:8780/health.');
+  }
+  if (!response.ok) throw new Error('Локальная панель недоступна. Проверьте http://127.0.0.1:8780/health.');
+  const html = await response.text();
+  const match = html.match(/<meta\s+name=["']csrf-token["']\s+content=["']([^"']+)["']/i);
+  if (!match) throw new Error('Не удалось обновить сеанс панели. Обновите страницу вручную.');
+  token = match[1];
+}
+
+async function api(path, values, retry=true) {
+  let response;
+  try {
+    response = await fetch('/api/' + path, {method:values === undefined ? 'GET':'POST', headers:{'X-DropRestorer-Token':token,...(values === undefined ? {}:{'Content-Type':'application/json'})}, ...(values === undefined ? {}:{body:JSON.stringify(values)})});
+  } catch (error) {
+    if (retry) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      try { await refreshToken(); return api(path, values, false); } catch (ignored) {}
+    }
+    throw new Error('Связь с локальным инструментом потеряна. Проверьте http://127.0.0.1:8780/health.');
+  }
+  if (response.status === 403 && retry) {
+    try { await refreshToken(); return api(path, values, false); }
+    catch (error) { throw new Error(error.message || 'Сеанс панели устарел. Обновите страницу.'); }
+  }
+  let result;
+  try { result = await response.json(); }
+  catch (error) { throw new Error('Локальный инструмент вернул некорректный ответ. Проверьте его состояние на /health.'); }
   if (!response.ok) throw new Error(result.error || 'Не удалось выполнить действие.');
   return result;
 }
