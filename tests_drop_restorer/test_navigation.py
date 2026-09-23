@@ -51,6 +51,26 @@ class NavigationTests(unittest.TestCase):
         self.assertEqual(len(soup.select('script[src="/assets/site-navigation.js"]')), 1)
         self.assertFalse(soup.select('link[href="/assets/drop-restorer.css"], script[src="/assets/drop-restorer.js"]'))
 
+    def test_wix_dropdown_host_is_neutralized_and_keeps_casino_in_main_menu(self):
+        soup = parse_html('''<header><wix-dropdown-menu id="comp-menu"
+          class="HYblus eK3b7p wixui-dropdown-menu hidden-during-prewarmup"
+          data-num-items="5" tabindex="-1"><nav><ul><li><a href="/about/">About</a></li></ul></nav>
+          </wix-dropdown-menu></header><main>Content</main>''')
+        navigation(soup, self.pages, self.request)
+        host = soup.select_one('#comp-menu.dr-menu-host')
+        self.assertIsNotNone(host)
+        self.assertEqual(host.name, 'div')
+        self.assertNotIn('hidden-during-prewarmup', host.get('class', []))
+        self.assertNotIn('data-num-items', host.attrs)
+        self.assertIs(host.select_one('nav.dr-navigation'), soup.select_one('nav.dr-navigation'))
+        self.assertEqual(len(soup.select('header .dr-casino')), 1)
+        self.assertEqual(len(soup.select('.dr-navigation')), 1)
+
+    def test_wix_menu_host_css_cancels_archived_grid_offset(self):
+        css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
+        self.assertIn('min-width:0!important', css)
+        self.assertIn('margin:0!important', css)
+
     def test_removed_links_keep_visual_wrappers_and_images(self):
         soup = parse_html('<main><a class="card" href="https://external.example/" onclick="location.href=this.href"><img src="/local.png"><span>Original caption</span></a></main>')
         clean_links(soup, 'https://example.com/', {})

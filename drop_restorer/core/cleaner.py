@@ -225,6 +225,38 @@ def navigation_labels(soup, pages: list[Page]) -> dict[str, str]:
     return labels
 
 
+def _neutralize_wix_menu_host(primary):
+    """Turn a downloaded Wix menu host into an ordinary visible container.
+
+    Wix's ``wix-dropdown-menu`` custom element hides itself until its original
+    generated child IDs are present and the client-side menu has completed its
+    layout pass.  The restored menu intentionally replaces those generated
+    children with a small deterministic ``nav``; leaving the custom element in
+    place therefore makes the menu disappear even though the links are present
+    in the HTML.  Replace only the nearest Wix menu host and keep its position
+    in the header so the recovered navigation remains in the main menu area.
+    """
+    if primary is None:
+        return None
+    host = primary.find_parent(
+        lambda node: getattr(node, 'name', None) == 'wix-dropdown-menu'
+        or any(token in ' '.join(node.get('class', [])).casefold()
+               for token in ('wix-dropdown-menu', 'wixui-dropdown-menu', 'hidden-during-prewarmup'))
+    )
+    if host is None:
+        return None
+    # A custom-element name is enough to trigger Wix's visibility lifecycle;
+    # use a neutral div and discard only Wix runtime attributes/classes.
+    host.name = 'div'
+    host['class'] = ['dr-menu-host']
+    for attr in list(host.attrs):
+        if attr == 'id':
+            continue
+        if attr.startswith('data-') or attr in ('hidden', 'tabindex', 'aria-hidden', 'role', 'style'):
+            host.attrs.pop(attr, None)
+    return host
+
+
 def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides: dict[str, str] | None = None):
     # A site's primary navigation is distinct from sidebars, mega-menu columns
     # and footer lists. Never populate every list with the whole site.
@@ -377,6 +409,7 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
             # their fixed desktop widths constrained to the viewport.
             if shell_table is not None and (table is shell_table or table in shell_table.descendants):
                 table['class'] = list(dict.fromkeys([*table.get('class', []), 'dr-legacy-width-table']))
+    _neutralize_wix_menu_host(primary)
     primary.clear()
     primary['class'] = list(dict.fromkeys([*primary.get('class', []), 'dr-navigation']))
     primary['aria-label'] = 'Main navigation'
