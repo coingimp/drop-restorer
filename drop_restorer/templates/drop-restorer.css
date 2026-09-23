@@ -47,7 +47,7 @@ body.dr-legacy-table-layout :is(table,tbody,tr,td)[height="100%"] {height:auto!i
 .dr-unlinked {cursor:inherit}
 /* Body links keep their normal appearance when the pointer passes over them.
    Navigation hover states remain intentionally scoped to .dr-navigation. */
-body :where(main, article, #PAGES_CONTAINER, #SITE_PAGES, .dr-article, .dr-casino-content) a:hover:not(.dr-navigation a) {
+body a:hover:not(.dr-navigation a) {
   background: transparent!important;
   color: inherit!important;
   text-decoration: inherit!important;
