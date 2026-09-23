@@ -8,7 +8,7 @@ from urllib.parse import unquote
 
 from lxml import etree
 
-from .cleaner import navigation, parse_html
+from .cleaner import navigation, navigation_labels, parse_html
 from .indexation import open_indexation
 from .theme_identity import theme_identity
 
@@ -168,13 +168,25 @@ def write_site(build):
                 'theme': identity.manifest(),
                 'pages': {}, 'seo_policy': runtime_policy, 'article_formatting': 1}
     contents = {}
+    # A previous checkpoint can already contain the generated navigation.  In
+    # that case its labels may have been derived from repeated document titles,
+    # while the untouched source still contains the donor's real menu text.
+    # Read that source once so re-exporting the build repairs the labels too.
+    source_labels = {}
+    if build.pages:
+        source_path = root / 'source' / (build.pages[0].key + '.html')
+        if source_path.is_file():
+            try:
+                source_labels = navigation_labels(parse_html(source_path.read_bytes()), build.pages)
+            except (OSError, ValueError):
+                source_labels = {}
     for page in build.pages:
         # A project can be opened and approved after the generator has been
         # upgraded.  Re-run the deterministic navigation repair at export
         # time so an older checkpoint cannot package a stale header fallback
         # beside the donor menu (the common failure on legacy table sites).
         soup = parse_html(page.html)
-        navigation(soup, build.pages, build.request)
+        navigation(soup, build.pages, build.request, label_overrides=source_labels)
         page.html = str(soup)
         soup = open_indexation(soup)
         for node in soup.select('link[href="/assets/drop-restorer.css"]'):

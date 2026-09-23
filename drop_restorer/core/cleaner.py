@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
-from urllib.parse import urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from bs4 import BeautifulSoup, Comment
 
@@ -183,12 +183,60 @@ def clean_links(soup, base: str, route_map: dict[str, str]):
             node['class'] = list(node.get('class', [])) + ['dr-unlinked']
 
 
-def navigation(soup, pages: list[Page], request: RestoreRequest):
+def _navigation_route(href: str) -> str:
+    """Normalize an archive menu href to the route used by ``Page`` objects.
+
+    Legacy menus commonly use relative ``index.html``/``./kontakt.html``
+    links.  ``clean_links`` normally normalizes these before this function is
+    called, but collecting labels before the old menu is removed also needs to
+    understand the raw form.
+    """
+    value = str(href or '').strip().split('#', 1)[0]
+    if not value or value.startswith(('javascript:', 'mailto:', 'tel:')):
+        return ''
+    parsed = urlsplit(value)
+    path = unquote(parsed.path or '/')
+    if not path.startswith('/'):
+        path = '/' + path.lstrip('./')
+    if re.search(r'/index(?:\.html?|\.php)?$', path, re.I):
+        path = '/'
+    path = quote(path, safe="/!$&'()*+,;=:@-._~")
+    return path + (('?' + parsed.query) if parsed.query else '')
+
+
+def navigation_labels(soup, pages: list[Page]) -> dict[str, str]:
+    """Collect visible labels from the donor's existing menu links.
+
+    A lot of archived sites use one document title for every page.  Using
+    that title as the menu label hides the fact that the selected archive
+    pages are different routes.  Keep the first useful donor label for each
+    selected route before the legacy menu is cleared or replaced.
+    """
+    routes = {page.route for page in pages if not page.casino}
+    labels: dict[str, str] = {}
+    for anchor in soup.select('a[href]'):
+        route = _navigation_route(anchor.get('href', ''))
+        if route not in routes or route in labels:
+            continue
+        text = anchor.get_text(' ', strip=True)
+        if not text or len(text) > 120 or text in ('...', '…'):
+            continue
+        labels[route] = text
+    return labels
+
+
+def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides: dict[str, str] | None = None):
     # A site's primary navigation is distinct from sidebars, mega-menu columns
     # and footer lists. Never populate every list with the whole site.
     from .primary_navigation import (HEADER, legacy_dynamic_primary, legacy_flash_primary,
                                      legacy_sidebar_target, legacy_table_primary, select_primary,
                                      secondary_context)
+    # Capture donor labels before legacy table/Flash placeholders are cleared.
+    # ``label_overrides`` is used by the exporter when a checkpoint already
+    # contains a generated menu and the raw source is still available.
+    donor_labels = navigation_labels(soup, pages)
+    if label_overrides:
+        donor_labels.update({route: text for route, text in label_overrides.items() if text})
     flash_primary, flash_slot, flash_host, flash_order = legacy_flash_primary(soup)
     dynamic_primary, dynamic_donor = legacy_dynamic_primary(soup)
     primary = flash_primary or select_primary(soup)
@@ -295,6 +343,15 @@ def navigation(soup, pages: list[Page], request: RestoreRequest):
             labels[page.route] = compact.group(1).strip() if compact else page.title
     else:
         regular_pages = [page for page in pages if not page.casino]
+    # Prefer a real label from the archived menu when the selected node had
+    # no links of its own, or when the only label it supplied is the repeated
+    # document title.  This keeps entries such as Öffnungszeiten, Kontakt and
+    # Impressum distinct even when every archive page shares one <title>.
+    for page in regular_pages:
+        candidate = donor_labels.get(page.route, '').strip()
+        current = labels.get(page.route, '').strip()
+        if candidate and (not current or current.casefold() == page.title.strip().casefold()):
+            labels[page.route] = candidate
     if primary.get('data-dr-layout') == 'legacy-vertical':
         soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-vertical-navigation']))
     if primary.get('data-dr-layout') == 'legacy-sidebar':

@@ -109,6 +109,27 @@ class NavigationTests(unittest.TestCase):
         self.assertIn('dr-legacy-table-layout', soup.body.get('class', []))
         self.assertFalse(primary_menu_issues(soup))
 
+    def test_graphical_menu_keeps_distinct_archive_labels_when_titles_repeat(self):
+        pages = [Page('home', '/', 'Sport-Forum Krefeld Stodolny GmBH', ''),
+                 Page('hours', '/oeffnungszeiten.html', 'Sport-Forum Krefeld Stodolny GmBH', ''),
+                 Page('contact', '/kontakt.html', 'Sport-Forum Krefeld Stodolny GmBH', ''),
+                 Page('legal', '/impressum.html', 'Sport-Forum Krefeld Stodolny GmBH', '')]
+        pages += [Page(page.slug, page.route, page.title, '', casino=True)
+                  for page in self.request.casino_pages]
+        soup = parse_html('''<body><table width="870"><tr><td><img src="banner.jpg"></td></tr>
+          <tr><td height="23" background="grafik/bck_leiste_navi.gif"><div id="FWTableContainer1">
+          <table><tr><td><a href="index.html">Angebot</a></td>
+          <td><a href="oeffnungszeiten.html">Öffnungszeiten</a></td>
+          <td><a href="kontakt.html">Kontakt</a></td>
+          <td><a href="impressum.html">Impressum</a></td></tr></table>
+          </div></td></tr><tr><td><main>Archived content</main></td></tr></table></body>''')
+        navigation(soup, pages, self.request)
+        labels = [(a.get_text(' ', strip=True), a.get('href'))
+                  for a in soup.select('#dr-primary-menu > li > a')]
+        self.assertEqual(labels, [('Home', '/'), ('Öffnungszeiten', '/oeffnungszeiten.html'),
+                                  ('Kontakt', '/kontakt.html'), ('Impressum', '/impressum.html')])
+        self.assertEqual(len(soup.select('#dr-primary-menu > .dr-casino')), 1)
+
     def test_graphical_table_menu_has_compact_responsive_styles(self):
         css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
         self.assertIn('.dr-navigation[data-dr-layout="legacy-table"]', css)
