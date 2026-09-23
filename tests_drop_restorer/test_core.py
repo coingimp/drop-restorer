@@ -272,6 +272,25 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(meta['_dr_route'], page.route)
         menus = [item for item in tree.findall('./channel/item') if item.findtext('wp:post_type', namespaces=NS) == 'nav_menu_item']
         self.assertEqual(len(menus), 6)
+        self.assertTrue(all(
+            any(node.findtext('wp:meta_key', namespaces=NS) == '_dr_package_menu'
+                and node.findtext('wp:meta_value', namespaces=NS) == '1'
+                for node in item.findall('wp:postmeta', NS))
+            for item in menus
+        ))
+
+    def test_wxr_makes_duplicate_archive_titles_importable(self):
+        # Wayback pages frequently share one document title.  WordPress
+        # importer otherwise treats later pages as existing and drops their
+        # content.  The admin title may be disambiguated; the archived body
+        # and the public route remain unchanged.
+        self.build.pages[1].title = self.build.pages[0].title
+        write_site(self.build)
+        tree = etree.parse(str(self.build.root / 'content.xml'))
+        items = [item for item in tree.findall('./channel/item') if item.findtext('wp:post_type', namespaces=NS) == 'page']
+        titles = [item.findtext('title') for item in items]
+        self.assertEqual(len(titles), len(set(titles)))
+        self.assertIn('about', titles[1].lower())
 
     def test_theme_routes_survive_first_request_before_rewrite_flush(self):
         functions = (self.build.root / 'theme' / 'functions.php').read_text(encoding='utf-8')

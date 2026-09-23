@@ -41,9 +41,32 @@ def wxr(build, contents: dict):
     for key, value in [('term_id', '1'), ('term_taxonomy', 'nav_menu'), ('term_slug', 'dr-primary'), ('term_name', 'Primary Menu')]:
         element(term, 'wp:' + key, value)
     export_date = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+    # The WordPress importer treats a page title as an identity when it
+    # checks whether a page already exists.  Legacy archives very often use
+    # the same <title> for every page (the German donor does exactly that),
+    # so exporting those titles verbatim silently drops all but the first
+    # page and its archived content.  Keep the visible archive HTML intact,
+    # but give imported WP records deterministic unique admin titles.
+    page_titles = {}
+    used_titles = set()
+    def imported_page_title(page):
+        base = (page.title or '').strip() or page.route.strip('/') or 'Restored page'
+        count = page_titles.get(base, 0)
+        page_titles[base] = count + 1
+        if count == 0 and base not in used_titles:
+            title = base
+        else:
+            stem = page.route.split('?', 1)[0].strip('/').replace('/', ' ') or 'home'
+            title = f'{base} — {stem}'
+            serial = 2
+            while title in used_titles:
+                title = f'{base} — {stem} {serial}'
+                serial += 1
+        used_titles.add(title)
+        return title
     for number, page in enumerate(build.pages, 1):
         item = etree.SubElement(channel, 'item')
-        element(item, 'title', page.title, True)
+        element(item, 'title', imported_page_title(page), True)
         element(item, 'link', build.request.origin + page.route)
         element(item, 'dc:creator', 'site-import', True)
         guid = element(item, 'guid', build.request.origin + '/?site-page=' + page.key)
@@ -88,7 +111,11 @@ def wxr(build, contents: dict):
         category.set('nicename', 'dr-primary')
         for key, value in {'_menu_item_type': 'post_type' if page else 'custom', '_menu_item_object': 'page' if page else 'custom',
                            '_menu_item_object_id': page_id, '_menu_item_menu_item_parent': parent,
-                           '_menu_item_url': '' if page else '#', '_menu_item_target': '', '_menu_item_classes': 'a:0:{}', '_menu_item_xfn': ''}.items():
+                           '_menu_item_url': '' if page else '#', '_menu_item_target': '', '_menu_item_classes': 'a:0:{}', '_menu_item_xfn': '',
+                           # Lets the theme distinguish package links from
+                           # owner-created links when the XML is imported
+                           # again into the same WordPress installation.
+                           '_dr_package_menu': '1'}.items():
             meta = etree.SubElement(item, '{' + WP + '}postmeta')
             element(meta, 'wp:meta_key', key, True)
             element(meta, 'wp:meta_value', value, True)
@@ -137,7 +164,8 @@ def write_site(build):
                                      '\nVersion: 0.1.11\nTested up to: 7.1\nRequires PHP: 8.0\nText Domain: ' + identity.text_domain + '\n*/\n', encoding='utf-8')
     runtime_policy = {key:value for key,value in build.seo_policy.items()
                       if key in ('version','url_style','casino_pending','redirects','widget_id','casino_layout')}
-    manifest = {'origin': build.request.origin, 'lang': build.request.lang, 'theme': identity.manifest(),
+    manifest = {'origin': build.request.origin, 'lang': build.request.lang, 'casino_label': build.request.casino_label,
+                'theme': identity.manifest(),
                 'pages': {}, 'seo_policy': runtime_policy, 'article_formatting': 1}
     contents = {}
     for page in build.pages:

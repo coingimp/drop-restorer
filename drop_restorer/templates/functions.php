@@ -125,9 +125,90 @@ function dr_casino_layout_css() {
 function dr_has_seo_plugin() {
     return defined('WPSEO_VERSION') || defined('RANK_MATH_VERSION') || defined('AIOSEO_VERSION');
 }
+function dr_menu_path($url) {
+    $url = (string) $url;
+    if (trim($url) === '' || trim($url) === '#') { return ''; }
+    $parsed = wp_parse_url($url);
+    if (!is_array($parsed)) { return ''; }
+    $path = rawurldecode((string) ($parsed['path'] ?? '/'));
+    if ($path === '') { $path = '/'; }
+    $home_path = rawurldecode((string) wp_parse_url((string) get_option('home'), PHP_URL_PATH));
+    $home_path = $home_path === '' ? '/' : '/' . trim($home_path, '/') . '/';
+    if ($home_path !== '/') {
+        $prefix = rtrim($home_path, '/');
+        if ($path === $prefix || strpos($path, $home_path) === 0) {
+            $path = substr($path, strlen($prefix));
+            if ($path === '') { $path = '/'; }
+        }
+    }
+    return '/' . trim($path, '/');
+}
+function dr_normalize_imported_menu() {
+    static $done = false;
+    if ($done) { return; }
+    $done = true;
+    $menu = wp_get_nav_menu_object('dr-primary');
+    if (!$menu) { return; }
+    $items = wp_get_nav_menu_items($menu->term_id);
+    if (!is_array($items) || !$items) { return; }
+    $site = dr_site();
+    $routes = array(); $casino_routes = array();
+    foreach ((array) ($site['pages'] ?? array()) as $page) {
+        $path = dr_menu_path($page['route'] ?? '');
+        if (!$path) { continue; }
+        $routes[$path] = true;
+        if (!empty($page['casino'])) { $casino_routes[$path] = true; }
+    }
+    if (!$routes) { return; }
+    $casino_label = trim((string) ($site['casino_label'] ?? ''));
+    $children = array();
+    foreach ($items as $item) {
+        $children[(int) $item->menu_item_parent][] = $item;
+    }
+    $parents = array();
+    foreach ($items as $item) {
+        if ((int) $item->menu_item_parent !== 0 || dr_menu_path($item->url) !== '') { continue; }
+        $has_casino_child = false;
+        foreach ($children[(int) $item->ID] ?? array() as $child) {
+            if (isset($casino_routes[dr_menu_path($child->url)])) { $has_casino_child = true; break; }
+        }
+        if (($casino_label !== '' && trim((string) $item->title) === $casino_label) || $has_casino_child) {
+            $parents[] = $item;
+        }
+    }
+    $canonical_parent = $parents[0] ?? null;
+    if ($canonical_parent) {
+        // A second XML import creates a second Casino parent. Move its
+        // children to the first parent before removing the duplicate.
+        foreach (array_slice($parents, 1) as $duplicate) {
+            foreach ($children[(int) $duplicate->ID] ?? array() as $child) {
+                update_post_meta($child->ID, '_menu_item_menu_item_parent', (string) $canonical_parent->ID);
+            }
+            wp_delete_post($duplicate->ID, true);
+        }
+    }
+    $duplicate_parent_ids = array_map(function($item) { return (int) $item->ID; }, array_slice($parents, 1));
+    $seen = array();
+    foreach ($items as $item) {
+        if (in_array((int) $item->ID, $duplicate_parent_ids, true)) { continue; }
+        $path = dr_menu_path($item->url);
+        if (!isset($routes[$path])) { continue; }
+        $expected_parent = isset($casino_routes[$path]) && $canonical_parent ? (int) $canonical_parent->ID : 0;
+        if ((int) $item->menu_item_parent !== $expected_parent) {
+            update_post_meta($item->ID, '_menu_item_menu_item_parent', (string) $expected_parent);
+        }
+        $key = (string) $expected_parent . '|' . $path;
+        if (isset($seen[$key])) {
+            wp_delete_post($item->ID, true);
+            continue;
+        }
+        $seen[$key] = true;
+    }
+}
 function dr_imported_menu() {
     $menu = wp_get_nav_menu_object('dr-primary');
     if (!$menu) { return null; }
+    dr_normalize_imported_menu();
     $items = wp_get_nav_menu_items($menu->term_id);
     return is_array($items) && count($items) > 0 ? $menu : null;
 }
@@ -163,6 +244,7 @@ function dr_assign_menu() {
         $locations['dr-primary'] = $menu->term_id;
         set_theme_mod('nav_menu_locations', $locations);
     }
+    dr_normalize_imported_menu();
 }
 add_action('after_switch_theme', 'dr_assign_menu');
 add_action('import_end', 'dr_assign_menu');
