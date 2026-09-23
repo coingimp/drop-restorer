@@ -94,6 +94,17 @@ def wxr(build, contents: dict):
     menu_labels = {}
     for anchor in parse_html(build.pages[0].html).select('.dr-menu a[href]'):
         menu_labels.setdefault(anchor['href'], anchor.get_text(' ', strip=True))
+    source_path = build.root / 'source' / (build.pages[0].key + '.html')
+    if source_path.is_file():
+        try:
+            source_labels = navigation_labels(parse_html(source_path.read_bytes()), build.pages)
+        except (OSError, ValueError):
+            source_labels = {}
+        page_titles = {page.route: page.title.strip().casefold() for page in build.pages if not page.casino}
+        for route, label in source_labels.items():
+            if label and (not menu_labels.get(route)
+                          or menu_labels[route].strip().casefold() == page_titles.get(route, '')):
+                menu_labels[route] = label
     menu_order = {route: index for index, route in enumerate(menu_labels)}
     primary = sorted([entry for entry in menu_entries if entry[1] and not entry[1].casino], key=lambda entry: menu_order.get(entry[1].route, 999))
     menu_entries = primary + [entry for entry in menu_entries if entry[1] is None or entry[1].casino]
