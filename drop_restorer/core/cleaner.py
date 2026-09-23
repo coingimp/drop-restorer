@@ -183,6 +183,41 @@ def clean_links(soup, base: str, route_map: dict[str, str]):
             node['class'] = list(node.get('class', [])) + ['dr-unlinked']
 
 
+def deactivate_bottom_menu_links(soup: BeautifulSoup) -> int:
+    """Remove anchors from footer and explicitly named bottom-menu regions.
+
+    Restored archives often contain a second, decorative menu at the bottom of
+    the page.  It is not the editable primary menu and its destinations are
+    frequently stale or point back to the donor site.  Keep its visible text
+    and images, but unwrap every ``<a>`` so the exported page cannot present
+    those entries as clickable navigation.  The primary menu is rebuilt by
+    :func:`navigation` separately and is therefore unaffected.
+
+    Return the number of unwrapped anchors so callers can add an auditable
+    cleanup record to the build log.
+    """
+    hosts = []
+    for node in soup.find_all(True):
+        if node.name == 'footer' or str(node.get('role', '')).casefold() == 'contentinfo':
+            hosts.append(node)
+            continue
+        token = ' '.join([str(node.get('id', '')), *[str(item) for item in node.get('class', [])]])
+        if re.search(r'(?:^|[-_ ])(?:menu|nav)[-_ ]*bottom(?:$|[-_ ])|(?:^|[-_ ])bottom[-_ ]*(?:menu|nav)(?:$|[-_ ])|menubottom', token, re.I):
+            hosts.append(node)
+    removed = 0
+    seen = set()
+    for host in hosts:
+        if id(host) in seen:
+            continue
+        seen.add(id(host))
+        for anchor in list(host.select('a')):
+            # ``unwrap`` preserves nested images, spans and text while
+            # removing href/target/onclick and the clickable element itself.
+            anchor.unwrap()
+            removed += 1
+    return removed
+
+
 def _navigation_route(href: str) -> str:
     """Normalize an archive menu href to the route used by ``Page`` objects.
 

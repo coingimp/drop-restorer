@@ -4,9 +4,9 @@
 .dr-navigation {box-sizing:border-box; max-width:100%; height:auto!important; z-index:50; overflow:visible!important}
 .dr-navigation-header {height:auto!important; max-width:100vw; box-sizing:border-box; overflow:visible!important}
 .dr-navigation-header > #logo {position:relative!important; inset:auto!important; box-sizing:border-box; padding:24px 16px}
-.dr-navigation > .dr-menu {display:flex!important; flex-wrap:wrap; align-items:center; gap:4px; width:auto!important; height:auto!important; margin:0!important; padding:0!important; list-style:none!important}
+.dr-navigation > .dr-menu {display:flex!important; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; width:100%!important; height:auto!important; margin:0!important; padding:0!important; list-style:none!important}
 .dr-navigation .dr-menu > li {display:block!important; float:none!important; position:relative!important; width:auto!important; height:auto!important; margin:0!important; padding:0!important; background:none!important; list-style:none!important}
-.dr-navigation .dr-menu > li > a, .dr-navigation .dr-casino-toggle {display:block!important; box-sizing:border-box; min-height:44px; max-width:100%; padding:12px 16px!important; margin:0!important; border:0!important; background:transparent; color:inherit; font:inherit; font-weight:600; line-height:1.35!important; text-decoration:none!important; text-transform:none!important; cursor:pointer; overflow-wrap:anywhere}
+.dr-navigation .dr-menu > li > a, .dr-navigation .dr-casino-toggle {display:block!important; box-sizing:border-box; min-height:44px; max-width:100%; padding:12px 16px!important; margin:0!important; border:0!important; background:transparent; color:inherit; font:inherit; font-size:18px!important; font-weight:400!important; line-height:1.35!important; text-decoration:none!important; text-transform:none!important; cursor:pointer; overflow-wrap:anywhere}
 .dr-navigation .dr-menu > li > a:hover, .dr-navigation .dr-casino-toggle:hover {background:#0000000a}
 .dr-casino-toggle::after {content:' ▾'}
 .dr-navigation button:focus-visible, .dr-navigation a:focus-visible {outline:2px solid currentColor; outline-offset:-3px}
@@ -45,6 +45,17 @@ img {max-width:100%; height:auto}
 body {overflow-wrap:break-word}
 body.dr-legacy-table-layout :is(table,tbody,tr,td)[height="100%"] {height:auto!important; min-height:0!important}
 .dr-unlinked {cursor:inherit}
+/* Body links keep their normal appearance when the pointer passes over them.
+   Navigation hover states remain intentionally scoped to .dr-navigation. */
+body :where(main, article, #PAGES_CONTAINER, #SITE_PAGES, .dr-article, .dr-casino-content) a:hover:not(.dr-navigation a) {
+  background: transparent!important;
+  color: inherit!important;
+  text-decoration: inherit!important;
+  box-shadow: none!important;
+  filter: none!important;
+  opacity: 1!important;
+  transform: none!important;
+}
 @media(min-width:801px) {
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) > .dr-menu {display:block!important; width:100%!important}
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-menu > li {display:block!important; width:100%!important; margin:0 0 3px!important}
@@ -52,6 +63,12 @@ body.dr-legacy-table-layout :is(table,tbody,tr,td)[height="100%"] {height:auto!i
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-casino-toggle {min-height:0!important; width:100%; padding:3px 6px!important; text-align:left; line-height:1.3!important}
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-submenu {position:static!important; right:auto!important; left:auto!important; width:100%!important; min-width:0; max-width:100%; box-sizing:border-box; margin:3px 0 0!important; box-shadow:none}
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-submenu a {min-height:0; padding:3px 6px!important; font-size:inherit!important}
+}
+@media(min-width:801px) {
+  .dr-navigation:not([data-dr-layout="legacy-vertical"]):not([data-dr-layout="legacy-sidebar"]):not([data-dr-layout="legacy-table"]):not([data-dr-layout="legacy-dynamic"]) > .dr-menu {
+    justify-content: center;
+    gap: 12px;
+  }
 }
 @media(max-width:800px) {
   body.dr-legacy-table-layout {min-width:0!important; max-width:100vw!important; overflow-x:hidden}
@@ -84,13 +101,14 @@ body.dr-legacy-table-layout :is(table,tbody,tr,td)[height="100%"] {height:auto!i
   .dr-navigation[data-dr-layout="legacy-vertical"] {position:absolute!important; top:60px!important; right:8px!important; bottom:auto!important; left:auto!important; width:144px!important; margin-left:0!important}
   .dr-navigation[data-dr-layout="legacy-sidebar"] {position:relative!important; inset:auto!important; width:100%!important; max-width:100%!important; margin:0 0 8px!important}
   .dr-navigation[data-dr-layout="legacy-dynamic"] {position:relative!important; inset:auto!important; width:100%!important; margin:8px 0!important}
-  .dr-mobile-toggle {display:block!important; background:#fff; color:#18222d; border:1px solid #c9d2dc; border-radius:5px; padding:10px 16px; min-height:44px; font:600 17px/1.4 Arial,sans-serif; cursor:pointer}
+  .dr-mobile-toggle {display:block!important; background:#fff; color:#18222d; border:1px solid #c9d2dc; border-radius:5px; padding:10px 16px; min-height:44px; font:400 18px/1.4 Arial,sans-serif; cursor:pointer}
   .dr-navigation > .dr-menu {display:none!important}
   .dr-navigation.dr-open > .dr-menu {display:flex!important; flex-direction:column; align-items:stretch; position:relative!important; width:100%!important; height:auto!important; max-height:none!important; padding:8px 0!important}
   .dr-navigation[data-dr-layout="legacy-sidebar"] > .dr-menu {display:none!important}
   .dr-navigation[data-dr-layout="legacy-sidebar"].dr-open > .dr-menu {display:flex!important}
   .dr-navigation .dr-menu > li {width:100%!important}
   .dr-navigation .dr-casino-toggle {width:100%; text-align:left}
+  .dr-navigation:not([data-dr-layout="legacy-vertical"]):not([data-dr-layout="legacy-sidebar"]):not([data-dr-layout="legacy-table"]):not([data-dr-layout="legacy-dynamic"]) .dr-submenu a {font-size:18px!important; font-weight:400!important}
   .dr-navigation .dr-submenu {position:static!important; width:100%!important; min-width:0; max-width:100%; box-sizing:border-box; box-shadow:none; margin-top:4px!important}
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-submenu {padding:4px!important}
   .dr-navigation:is([data-dr-layout="legacy-vertical"],[data-dr-layout="legacy-dynamic"]) .dr-submenu a {min-height:0!important; padding:7px 8px!important; font-size:14px!important; line-height:1.35!important}

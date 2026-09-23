@@ -13,7 +13,8 @@ from urllib.parse import urlsplit
 from ..agents.client import AgentRequestError
 from .assets import AssetDownloader
 from .branding import branding
-from .cleaner import casino_shell, clean, clean_links, navigation, parse_html, set_seo
+from .cleaner import (casino_shell, clean, clean_links, deactivate_bottom_menu_links,
+                      navigation, parse_html, set_seo)
 from .downloader import ArchiveClient
 from .metadata import normalize
 from .layout import repair_layout
@@ -259,6 +260,11 @@ class Pipeline:
                 base = snapshots[index].original if index < len(snapshots) else snapshots[0].original
                 before_links = len(soup.select('a[href]'))
                 clean_links(soup, base, route_map)
+                bottom_links = deactivate_bottom_menu_links(soup)
+                if bottom_links:
+                    build.cleanup.append({'kind': 'links', 'route': page.route,
+                                          'count': bottom_links,
+                                          'detail': 'Удалены теги <a> из нижнего меню/подвала'})
                 build.cleanup.append({'kind': 'links', 'route': page.route,
                                       'count': before_links - len(soup.select('a[href]')),
                                       'detail': 'Удалены ссылки вне выбранных страниц'})

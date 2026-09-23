@@ -2,7 +2,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from drop_restorer.core.cleaner import casino_shell, casino_shell_issues, clean, clean_links, navigation, parse_html
+from drop_restorer.core.cleaner import (casino_shell, casino_shell_issues, clean, clean_links,
+                                        deactivate_bottom_menu_links, navigation, parse_html)
 from drop_restorer.core.layout import repair_layout
 from drop_restorer.core.models import Page
 from tests_drop_restorer.fixtures import request
@@ -70,6 +71,25 @@ class NavigationTests(unittest.TestCase):
         css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
         self.assertIn('min-width:0!important', css)
         self.assertIn('margin:0!important', css)
+
+    def test_primary_menu_is_centered_with_regular_larger_type(self):
+        css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
+        self.assertIn('justify-content:center', css.replace(' ', ''))
+        self.assertIn('font-size:18px!important', css)
+        self.assertIn('font-weight:400!important', css)
+        self.assertIn('a:hover:not(.dr-navigation a)', css)
+
+    def test_bottom_menu_links_are_unwrapped_but_primary_menu_survives(self):
+        soup = parse_html('''<header><nav class="dr-navigation"><a href="/">Primary</a></nav></header>
+          <main><p>Article <a href="/about/">body link</a></p></main>
+          <footer><a href="/about/"><strong>About</strong></a><span id="menubottom"><a href="/contact/">Contact</a></span></footer>''')
+        removed = deactivate_bottom_menu_links(soup)
+        self.assertEqual(removed, 2)
+        self.assertIsNone(soup.select_one('footer a'))
+        self.assertIsNone(soup.select_one('#menubottom a'))
+        self.assertEqual(soup.select_one('footer strong').get_text(), 'About')
+        self.assertIsNotNone(soup.select_one('header nav.dr-navigation a'))
+        self.assertIsNotNone(soup.select_one('main a'))
 
     def test_removed_links_keep_visual_wrappers_and_images(self):
         soup = parse_html('<main><a class="card" href="https://external.example/" onclick="location.href=this.href"><img src="/local.png"><span>Original caption</span></a></main>')

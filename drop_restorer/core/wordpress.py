@@ -8,7 +8,7 @@ from urllib.parse import unquote
 
 from lxml import etree
 
-from .cleaner import navigation, navigation_labels, parse_html
+from .cleaner import deactivate_bottom_menu_links, navigation, navigation_labels, parse_html
 from .indexation import open_indexation
 from .theme_identity import theme_identity
 
@@ -197,6 +197,7 @@ def write_site(build):
         # time so an older checkpoint cannot package a stale header fallback
         # beside the donor menu (the common failure on legacy table sites).
         soup = parse_html(page.html)
+        deactivate_bottom_menu_links(soup)
         navigation(soup, build.pages, build.request, label_overrides=source_labels)
         page.html = str(soup)
         soup = open_indexation(soup)
