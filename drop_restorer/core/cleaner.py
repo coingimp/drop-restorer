@@ -444,6 +444,9 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
             # their fixed desktop widths constrained to the viewport.
             if shell_table is not None and (table is shell_table or table in shell_table.descendants):
                 table['class'] = list(dict.fromkeys([*table.get('class', []), 'dr-legacy-width-table']))
+    if ('menu-main-container' in primary.get('class', [])
+            and primary.find_parent('nav', id='head-menu') is not None):
+        primary['data-dr-layout'] = 'wordpress-main-slot'
     _neutralize_wix_menu_host(primary)
     primary.clear()
     primary['class'] = list(dict.fromkeys([*primary.get('class', []), 'dr-navigation']))

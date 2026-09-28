@@ -122,3 +122,9 @@ body a:hover:not(.dr-navigation a) {
   .dr-navigation[data-dr-layout="legacy-table"] .dr-submenu {position:static!important; width:100%!important; min-width:0; max-width:100%; margin:0!important; padding:4px 0!important; border:0; box-shadow:none;}
   .dr-navigation[data-dr-layout="legacy-table"] .dr-submenu a {min-height:32px; padding:7px 20px!important; font-size:14px!important;}
 }
+.dr-navigation[data-dr-layout="wordpress-main-slot"] > .dr-menu {box-sizing:border-box!important; width:calc(100% - 100px)!important; margin-left:0!important; margin-right:100px!important; flex-wrap:nowrap!important; justify-content:center!important; gap:7px!important}
+.dr-navigation[data-dr-layout="wordpress-main-slot"] .dr-menu > li > a,
+.dr-navigation[data-dr-layout="wordpress-main-slot"] .dr-casino-toggle {min-height:35px!important; padding:5px 8px!important; white-space:nowrap!important}
+@media(max-width:800px) {
+  .dr-navigation[data-dr-layout="wordpress-main-slot"] > .dr-mobile-toggle {min-height:35px!important; padding:4px 8px!important}
+}

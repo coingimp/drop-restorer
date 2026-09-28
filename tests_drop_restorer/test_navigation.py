@@ -58,12 +58,22 @@ class NavigationTests(unittest.TestCase):
         menu = soup.select_one('#head-menu .menu-main-container.dr-navigation')
         self.assertIsNotNone(menu)
         self.assertNotEqual(menu.get('data-dr-placement'), 'header-fallback')
+        self.assertEqual(menu.get('data-dr-layout'), 'wordpress-main-slot')
         self.assertEqual([a.get_text() for a in menu.select(':scope > #dr-primary-menu > li > a')],
                          ['Startseite', 'Fotografen', 'Kontakt'])
         self.assertEqual(len(menu.select(':scope > #dr-primary-menu > .dr-casino')), 1)
         self.assertIsNone(soup.select_one('body > nav.dr-navigation[data-dr-placement="header-fallback"]'))
         self.assertEqual(len(soup.select('.dr-navigation')), 1)
         self.assertFalse(primary_menu_issues(soup))
+
+    def test_wordpress_main_slot_css_keeps_casino_in_the_navigation_row(self):
+        css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
+        self.assertIn('.dr-navigation[data-dr-layout="wordpress-main-slot"] > .dr-menu', css)
+        self.assertIn('flex-wrap:nowrap!important', css)
+        self.assertIn('width:calc(100% - 100px)!important', css)
+        self.assertIn('margin-right:100px!important', css)
+        self.assertIn('gap:7px!important', css)
+        self.assertIn('min-height:35px!important; padding:5px 8px!important', css)
 
     def test_navigation_repeat_does_not_duplicate_controls_assets_or_menu(self):
         soup = parse_html('<header><ul id="primary-nav"><li><a href="/about/">About</a></li></ul></header><main>Text</main>')

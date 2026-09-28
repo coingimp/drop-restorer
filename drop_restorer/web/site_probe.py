@@ -25,6 +25,7 @@ MEASURE = r'''(() => {
   h1:[...document.querySelectorAll('h1')].map(e=>e.innerText),
   footer:!!document.querySelector('footer,[role=contentinfo],#ja-footer,#footer,#site-footer'),
   menu_failed:innerWidth<=800 && (!button||!menu||button.getAttribute('aria-expanded')!=='true'||!visible(menu)||!casino||!submenu||casino.getAttribute('aria-expanded')!=='true'||!visible(submenu)),
+  menu_position_failed:(()=>{const nav=document.querySelector('.dr-navigation[data-dr-layout="wordpress-main-slot"]');if(!nav)return false;const host=document.querySelector('#head-menu'),items=[...nav.querySelectorAll('#dr-primary-menu > li')],rects=items.map(e=>e.getBoundingClientRect()),lang=document.querySelector('#lang_sel_list'),lr=lang?.getBoundingClientRect();return !host||!host.contains(nav)||(innerWidth>800&&(rects.some(r=>Math.abs(r.top-rects[0].top)>2)||Math.max(...rects.map(r=>r.bottom))>host.getBoundingClientRect().bottom+1||(lr&&rects.some(r=>r.right>lr.left-2&&r.left<lr.right+2&&r.bottom>lr.top&&r.top<lr.bottom))));})(),
   menu_links:[...document.querySelectorAll('#dr-primary-menu a[href]')].map(a=>a.getAttribute('href')),
   favicon:[...document.querySelectorAll('link[rel~=icon]')].map(e=>e.href)
  };
@@ -91,6 +92,9 @@ def main():
             value=None
         if not isinstance(value,dict):
             error.append(p.route+': не удалось прочитать DOM');app.quit();return
+        if value.get('menu_position_failed'):
+            error.append(p.route+': Casino или другой пункт меню вышел из основной строки под баннером.')
+            app.quit();return
         value.update(route=p.route,key=p.key,device=device)
         icon_path = favicon_file(value.get('favicon'))
         value['favicon_failed'] = icon_path is None
