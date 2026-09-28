@@ -16,6 +16,44 @@ def _numeric_dimension(value):
     return int(match.group()) if match else 0
 
 
+LANGUAGE_SWITCHER_SELECTORS = (
+    '#lang_sel', '#lang_sel_list', '[id^="lang_sel_"]', '[class*="lang_sel"]',
+    '[id*="wpml-ls"]', '[class*="wpml-ls"]', '.icl_lang_sel_widget',
+    'li.lang-item', '.pll-parent-menu-item', '.pll-switcher',
+    '[id*="qtranslate"]', '[class*="qtranslate"]',
+    '#weglot_here', '[id*="weglot"]', '[class*="weglot"]',
+    '[class*="trp-language-switcher"]',
+    '[id*="gtranslate"]', '[class*="gtranslate"]',
+    '.language-switcher', '.language_switcher', '.language-selector', '.language_selector',
+    '[id*="language-switcher"]', '[class*="language-switcher"]',
+    '[id*="language_selector"]', '[class*="language_selector"]',
+    '[data-language-switcher]', '[data-lang-switcher]',
+)
+
+
+def strip_language_switchers(soup, removed=None):
+    """Remove visible language-switcher UI while preserving the page's lang metadata."""
+    selectors = ', '.join(LANGUAGE_SWITCHER_SELECTORS)
+    for node in list(soup.select(selectors)):
+        if node.parent is None:
+            continue
+        detail = node.get('id') or ' '.join(node.get('class', [])) or node.name
+        if removed is not None:
+            removed.append({'kind': 'language', 'detail': 'Удалён переключатель языков: ' + str(detail)})
+        node.decompose()
+    # Some WPML themes only mark the tiny flag image, leaving the language
+    # item itself unlabelled. Remove its link/list item as a unit.
+    for flag in list(soup.select('img.iclflag, img.wpml-ls-flag')):
+        if flag.parent is None:
+            continue
+        item = flag.find_parent('li') or flag.find_parent('a') or flag
+        if item.parent is None:
+            continue
+        if removed is not None:
+            removed.append({'kind': 'language', 'detail': 'Удалён пункт меню с флажком языка'})
+        item.decompose()
+
+
 def _flash_menu_token(node):
     embed = node.find('embed')
     movie = node.find('param', attrs={'name': re.compile(r'^movie$', re.I)})
@@ -95,6 +133,7 @@ def parse_html(raw: str | bytes) -> BeautifulSoup:
 def clean(soup: BeautifulSoup, lang: str, removed=None):
     removed = removed if removed is not None else []
     preserve_flash_menu_slot(soup)
+    strip_language_switchers(soup, removed)
     for comment in soup.find_all(string=lambda value: isinstance(value, Comment)):
         if any(x in comment.lower() for x in ('wayback', 'archive.org', 'begin wayback', 'end wayback')):
             comment.extract()
@@ -293,6 +332,7 @@ def _neutralize_wix_menu_host(primary):
 
 
 def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides: dict[str, str] | None = None):
+    strip_language_switchers(soup)
     # A site's primary navigation is distinct from sidebars, mega-menu columns
     # and footer lists. Never populate every list with the whole site.
     from .primary_navigation import (HEADER, legacy_dynamic_primary, legacy_flash_primary,

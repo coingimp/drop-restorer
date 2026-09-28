@@ -24,6 +24,7 @@ MEASURE = r'''(() => {
   unreadable:texts.filter(e=>{const s=getComputedStyle(e);return (innerWidth<600&&parseFloat(s.fontSize)<13)||((e.scrollWidth>e.clientWidth+2||e.scrollHeight>e.clientHeight+2)&&s.overflow==='hidden');}).map(label),
   h1:[...document.querySelectorAll('h1')].map(e=>e.innerText),
   footer:!!document.querySelector('footer,[role=contentinfo],#ja-footer,#footer,#site-footer'),
+  language_switcher_failed:!!document.querySelector('#lang_sel,#lang_sel_list,[id^="lang_sel_"],[class*="lang_sel"],[id*="wpml-ls"],[class*="wpml-ls"],.icl_lang_sel_widget,li.lang-item,.pll-parent-menu-item,.pll-switcher,[id*="qtranslate"],[class*="qtranslate"],#weglot_here,[id*="weglot"],[class*="weglot"],[class*="trp-language-switcher"],[id*="gtranslate"],[class*="gtranslate"],.language-switcher,.language_switcher,.language-selector,.language_selector,[id*="language-switcher"],[class*="language-switcher"],[id*="language_selector"],[class*="language_selector"],[data-language-switcher],[data-lang-switcher],img.iclflag,img.wpml-ls-flag'),
   menu_failed:innerWidth<=800 && (!button||!menu||button.getAttribute('aria-expanded')!=='true'||!visible(menu)||!casino||!submenu||casino.getAttribute('aria-expanded')!=='true'||!visible(submenu)),
   menu_position_failed:(()=>{const nav=document.querySelector('.dr-navigation[data-dr-layout="wordpress-main-slot"]');if(!nav)return false;const host=document.querySelector('#head-menu'),items=[...nav.querySelectorAll('#dr-primary-menu > li')],rects=items.map(e=>e.getBoundingClientRect()),lang=document.querySelector('#lang_sel_list'),lr=lang?.getBoundingClientRect();return !host||!host.contains(nav)||(innerWidth>800&&(rects.some(r=>Math.abs(r.top-rects[0].top)>2)||Math.max(...rects.map(r=>r.bottom))>host.getBoundingClientRect().bottom+1||(lr&&rects.some(r=>r.right>lr.left-2&&r.left<lr.right+2&&r.bottom>lr.top&&r.top<lr.bottom))));})(),
   menu_links:[...document.querySelectorAll('#dr-primary-menu a[href]')].map(a=>a.getAttribute('href')),
@@ -94,6 +95,9 @@ def main():
             error.append(p.route+': не удалось прочитать DOM');app.quit();return
         if value.get('menu_position_failed'):
             error.append(p.route+': Casino или другой пункт меню вышел из основной строки под баннером.')
+            app.quit();return
+        if value.get('language_switcher_failed'):
+            error.append(p.route+': в восстановленной странице остался переключатель языков или флажок.')
             app.quit();return
         value.update(route=p.route,key=p.key,device=device)
         icon_path = favicon_file(value.get('favicon'))

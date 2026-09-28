@@ -53,7 +53,10 @@ class NavigationTests(unittest.TestCase):
           <div class="gesamt"><div class="header"><nav id="head-menu" class="main-box-with-shadow">
           <div class="main-width"><div class="menu-main-container"><ul id="menu-main" class="menu">
           <li><a href="/">Startseite</a></li><li><a href="/fotografen/">Fotografen</a></li>
-          <li><a href="/kontakt/">Kontakt</a></li></ul></div></div></nav></div></div></body>''')
+          <li><a href="/kontakt/">Kontakt</a></li><li class="lang-item"><a href="/en/"><img class="iclflag" src="/en.png"/>English</a></li></ul></div></div>
+          <div class="lang_sel_list_horizontal" id="lang_sel_list"><ul><li><a><img class="iclflag" src="/de.png"/></a></li></ul></div>
+          <div class="wpml-ls-statics-shortcode_actions"><img class="wpml-ls-flag" src="/fr.png"/></div>
+          <div class="language-switcher">EN / ES</div></nav></div></div></body>''')
         navigation(soup, pages, self.request)
         menu = soup.select_one('#head-menu .menu-main-container.dr-navigation')
         self.assertIsNotNone(menu)
@@ -63,6 +66,7 @@ class NavigationTests(unittest.TestCase):
                          ['Startseite', 'Fotografen', 'Kontakt'])
         self.assertEqual(len(menu.select(':scope > #dr-primary-menu > .dr-casino')), 1)
         self.assertIsNone(soup.select_one('body > nav.dr-navigation[data-dr-placement="header-fallback"]'))
+        self.assertFalse(soup.select('#lang_sel, #lang_sel_list, .lang-item, .wpml-ls-statics-shortcode_actions, .language-switcher, img.iclflag, img.wpml-ls-flag'))
         self.assertEqual(len(soup.select('.dr-navigation')), 1)
         self.assertFalse(primary_menu_issues(soup))
 
@@ -70,9 +74,9 @@ class NavigationTests(unittest.TestCase):
         css = (Path(__file__).parents[1] / 'drop_restorer' / 'templates' / 'drop-restorer.css').read_text(encoding='utf-8')
         self.assertIn('.dr-navigation[data-dr-layout="wordpress-main-slot"] > .dr-menu', css)
         self.assertIn('flex-wrap:nowrap!important', css)
-        self.assertIn('width:calc(100% - 100px)!important', css)
-        self.assertIn('margin-right:100px!important', css)
-        self.assertIn('gap:7px!important', css)
+        self.assertIn('width:100%!important', css)
+        self.assertIn('margin:0!important', css)
+        self.assertIn('gap:12px!important', css)
         self.assertIn('min-height:35px!important; padding:5px 8px!important', css)
 
     def test_navigation_repeat_does_not_duplicate_controls_assets_or_menu(self):
