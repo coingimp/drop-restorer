@@ -41,6 +41,30 @@ class NavigationTests(unittest.TestCase):
         self.assertIsNone(soup.select_one('main .dr-menu'))
         self.assertIsNone(soup.select_one('footer .dr-menu'))
 
+    def test_wordpress_menu_main_container_replaces_top_fallback_in_donor_slot(self):
+        pages = [Page('home', '/', 'Photokina', ''),
+                 Page('photographers', '/fotografen/', 'Fotografen', ''),
+                 Page('contact', '/kontakt/', 'Kontakt', '')]
+        pages += [Page(page.slug, page.route, page.title, '', casino=True)
+                  for page in self.request.casino_pages]
+        self.request.lang = 'de-DE'
+        soup = parse_html('''<body><nav class="dr-navigation" data-dr-placement="header-fallback">
+          <ul id="dr-primary-menu"><li><a href="/">Startseite</a></li></ul></nav>
+          <div class="gesamt"><div class="header"><nav id="head-menu" class="main-box-with-shadow">
+          <div class="main-width"><div class="menu-main-container"><ul id="menu-main" class="menu">
+          <li><a href="/">Startseite</a></li><li><a href="/fotografen/">Fotografen</a></li>
+          <li><a href="/kontakt/">Kontakt</a></li></ul></div></div></nav></div></div></body>''')
+        navigation(soup, pages, self.request)
+        menu = soup.select_one('#head-menu .menu-main-container.dr-navigation')
+        self.assertIsNotNone(menu)
+        self.assertNotEqual(menu.get('data-dr-placement'), 'header-fallback')
+        self.assertEqual([a.get_text() for a in menu.select(':scope > #dr-primary-menu > li > a')],
+                         ['Startseite', 'Fotografen', 'Kontakt'])
+        self.assertEqual(len(menu.select(':scope > #dr-primary-menu > .dr-casino')), 1)
+        self.assertIsNone(soup.select_one('body > nav.dr-navigation[data-dr-placement="header-fallback"]'))
+        self.assertEqual(len(soup.select('.dr-navigation')), 1)
+        self.assertFalse(primary_menu_issues(soup))
+
     def test_navigation_repeat_does_not_duplicate_controls_assets_or_menu(self):
         soup = parse_html('<header><ul id="primary-nav"><li><a href="/about/">About</a></li></ul></header><main>Text</main>')
         for _ in range(2):

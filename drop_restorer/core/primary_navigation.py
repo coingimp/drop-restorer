@@ -4,6 +4,7 @@ import re
 HEADER = 'header, [role="banner"], #header, #masthead, #site-header, #header-main, #header-secondary, #ja-header'
 PRIMARY = ('#primary-nav', '#main-nav', '#main-navigation', '#ja-mainnav', '#mainmenu', '#main-menu',
            '.primary-navigation', '.main-navigation', '.mainmenu', '.main-menu', '.mainnav', '.main-nav',
+           '#head-menu .menu-main-container',
            '#topmenu', '#top-menu', '.topmenu', '.top-menu', 'nav[aria-label="Main"]',
            'nav[aria-label="Main navigation"]', '.dr-navigation')
 SECONDARY = re.compile(r'^(?:sidebar.*|.*sidebar|secondary|secondary-menu|secondary-nav|secondary-navigation|nav-secondary|menu-secondary|side-menu|side-nav|smenu|'
