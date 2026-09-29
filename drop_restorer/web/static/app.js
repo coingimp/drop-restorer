@@ -189,15 +189,15 @@ function renderMetadata() {
   const build=state.build;
   $('metadata-empty').hidden=!!build; $('metadata-content').hidden=!build;
   if(!build) return;
-  const layout=build.seo_policy?.casino_layout || {content_width_px:1120,table_width_px:0,row_height_px:110,cell_padding_px:12,cell_widths_px:{}};
-  const fields={content_width_px:layout.content_width_px ?? 1120,table_width_px:layout.table_width_px ?? 0,row_height_px:layout.row_height_px ?? 110,cell_padding_px:layout.cell_padding_px ?? 12};
+  const layout=build.seo_policy?.casino_layout || {content_width_px:1120,navigation_width_px:0,table_width_px:0,row_height_px:110,cell_padding_px:12,cell_widths_px:{}};
+  const fields={content_width_px:layout.content_width_px ?? 1120,navigation_width_px:layout.navigation_width_px ?? 0,table_width_px:layout.table_width_px ?? 0,row_height_px:layout.row_height_px ?? 110,cell_padding_px:layout.cell_padding_px ?? 12};
   Object.entries(fields).forEach(([key,value])=>{const el=$('casino-layout-form').elements[key];if(el) el.value=value;});
   ['logo','bonus','characteristics','rating','button'].forEach(key=>{const el=$('casino-layout-form').elements['cell_'+key];if(el) el.value=layout.cell_widths_px?.[key] ?? 0;});
   const pending=build.status==='metadata_review';
   $('metadata-status').textContent=pending?'Страницы скачаны. Можно одобрить исходные метаданные и продолжить без агента.':(build.status==='site_review'?'Страницы подготовлены. Одобрите сайт в SEO-чек-листе или превью, чтобы создать тему. ':'Тема создана. ')+ 'Выбор метаданных: '+(build.metadata_decision==='keep'?'оставить исходные':build.metadata_decision==='agent'?'варианты агента':'сохранённые данные')+'.';
   $('casino-layout-help').textContent=build.status==='ready'
-    ?'Эти значения меняют оформление казино-страниц и таблиц в готовой теме WordPress. Сохранение обновит тему и отменит прежнее одобрение упаковки: после этого снова откройте превью и подтвердите новую версию.'
-    :'Эти параметры применяются только к трём созданным страницам казино и всему их содержимому. Значение 0 у ширины означает всю доступную ширину контейнера; в старой двухколоночной теме боковое меню сохраняется, а контент автоматически сжимается до ширины экрана.';
+    ?'Эти значения отдельно меняют ширину контента и главного меню только на казино-страницах готовой темы WordPress. Сохранение обновит тему и отменит прежнее одобрение упаковки: после этого снова откройте превью и подтвердите новую версию.'
+    :'Ширина контента и главного меню настраивается отдельно и применяется только к страницам казино. На телефонах оболочка и меню автоматически занимают ширину экрана без горизонтального скролла.';
   $('metadata-list').innerHTML=build.pages.map(page=>{
     const row=build.metadata_review[page.key];
     if(page.casino) return `<article class="card metadata-page"><h2>${esc(page.title)} <span class="badge">Казино</span></h2><div class="route">${esc(page.route)}</div><p class="muted">Контент и метаданные задаёт владелец в WordPress. Каноникл: ${esc(build.origin+page.route)}</p></article>`;
@@ -306,7 +306,7 @@ $('cancel').onclick=()=>perform(()=>api('cancel',{}));
 $('propose').onclick=()=>perform(()=>api('action/propose',{id:id()}));
 $('sample-metadata').onclick=()=>perform(()=>api('agents/metadata-sample',{id:id(),key:$('sample-page').value}));
 $('sample-page').onchange=controls;
-$('casino-layout-form').onsubmit=event=>{event.preventDefault();const form=event.target;const number=name=>Number(form.elements[name].value);const layout={content_width_px:number('content_width_px'),table_width_px:number('table_width_px'),row_height_px:number('row_height_px'),cell_padding_px:number('cell_padding_px'),cell_widths_px:{logo:number('cell_logo'),bonus:number('cell_bonus'),characteristics:number('cell_characteristics'),rating:number('cell_rating'),button:number('cell_button')}};perform(()=>api('action/layout',{id:id(),layout}));};
+$('casino-layout-form').onsubmit=event=>{event.preventDefault();const form=event.target;const number=name=>Number(form.elements[name].value);const layout={content_width_px:number('content_width_px'),navigation_width_px:number('navigation_width_px'),table_width_px:number('table_width_px'),row_height_px:number('row_height_px'),cell_padding_px:number('cell_padding_px'),cell_widths_px:{logo:number('cell_logo'),bonus:number('cell_bonus'),characteristics:number('cell_characteristics'),rating:number('cell_rating'),button:number('cell_button')}};perform(()=>api('action/layout',{id:id(),layout}));};
 $('keep').onclick=()=>perform(async()=>{openedId=id();await api('action/continue',{id:id(),decision:'keep'});});
 $('apply-meta').onclick=()=>perform(async()=>{openedId=id();await api('action/continue',{id:id(),decision:'agent'});});
 $('reopen').onclick=()=>perform(async()=>{openedId=id();await api('action/reopen',{id:id()});});

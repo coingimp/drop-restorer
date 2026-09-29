@@ -12,6 +12,7 @@ CELL_KEYS = ('logo', 'bonus', 'characteristics', 'rating', 'button')
 def default_layout() -> dict:
     return {
         'content_width_px': 1120,
+        'navigation_width_px': 0,
         'table_width_px': 0,
         'row_height_px': 110,
         'cell_padding_px': 12,
@@ -36,6 +37,7 @@ def normalize_layout(value) -> dict:
         widths = {}
     return {
         'content_width_px': _integer(source.get('content_width_px'), defaults['content_width_px'], 0, 2400),
+        'navigation_width_px': _integer(source.get('navigation_width_px'), defaults['navigation_width_px'], 0, 2400),
         'table_width_px': _integer(source.get('table_width_px'), defaults['table_width_px'], 0, 2400),
         'row_height_px': _integer(source.get('row_height_px'), defaults['row_height_px'], 72, 400),
         'cell_padding_px': _integer(source.get('cell_padding_px'), defaults['cell_padding_px'], 0, 32),
@@ -57,6 +59,12 @@ def css_for_layout(layout: dict) -> str:
     table = f"{layout['table_width_px']}px" if layout['table_width_px'] else '100%'
     pad = f"{layout['cell_padding_px']}px"
     row = f"{layout['row_height_px']}px"
+    navigation_width = layout['navigation_width_px'] or layout['content_width_px']
+    shell_width = max(layout['content_width_px'], navigation_width)
+    shell_width_css = (f"min({shell_width}px, calc(100vw - 32px))" if shell_width
+                       else 'calc(100% - 32px)')
+    navigation_width_css = (f"min({navigation_width}px, calc(100vw - 32px))"
+                            if navigation_width else '100%')
     legacy_shell_width = 'fit-content' if layout['content_width_px'] else 'calc(100% - 32px)'
     legacy_content_width = f"{layout['content_width_px']}px" if layout['content_width_px'] else 'auto'
     legacy_content_flex = (f"1 1 {layout['content_width_px']}px"
@@ -78,6 +86,25 @@ def css_for_layout(layout: dict) -> str:
         for key, selector in selectors.items()
         if layout['cell_widths_px'][key]
     )
+    wordpress_main_slot = f"""
+@media (min-width: 801px) {{
+  body.dr-casino-page.dr-wordpress-main-slot .gesamt {{ box-sizing: border-box !important; width: {shell_width_css} !important; max-width: calc(100vw - 32px) !important; margin-left: auto !important; margin-right: auto !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header {{ position: relative !important; width: 100% !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header_image {{ display: block !important; max-width: 100% !important; height: auto !important; margin-left: auto !important; margin-right: auto !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header .logo, body.dr-casino-page.dr-wordpress-main-slot .header .slogan {{ left: max(0px, calc((100% - 1000px) / 2)) !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot #head-menu {{ box-sizing: border-box !important; width: {navigation_width_css} !important; max-width: 100% !important; margin-left: auto !important; margin-right: auto !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot #head-menu .main-width {{ box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; margin-left: auto !important; margin-right: auto !important; }}
+}}
+@media (max-width: 800px) {{
+  body.dr-casino-page.dr-wordpress-main-slot .gesamt {{ box-sizing: border-box !important; width: 100% !important; max-width: 100vw !important; margin-left: auto !important; margin-right: auto !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header {{ position: relative !important; width: 100% !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header_image {{ display: block !important; width: 100% !important; max-width: 100% !important; height: auto !important; margin-left: auto !important; margin-right: auto !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot .header .logo, body.dr-casino-page.dr-wordpress-main-slot .header .slogan {{ left: 0 !important; max-width: calc(100% - 32px) !important; margin-left: 16px !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot #head-menu {{ box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; height: auto !important; min-height: 0 !important; margin-top: 0 !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot #head-menu .main-width, body.dr-casino-page.dr-wordpress-main-slot #head-menu .dr-navigation {{ box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; height: auto !important; min-height: 0 !important; }}
+  body.dr-casino-page.dr-wordpress-main-slot #dr-primary-menu {{ position: relative !important; inset: auto !important; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; }}
+}}
+"""
     return f"""
 <style id="dr-casino-layout">
 body.dr-casino-page .dr-casino-content {{
@@ -116,6 +143,7 @@ body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr t
   }}
 }}
 {columns}
+{wordpress_main_slot}
 @media (max-width: 768px) {{ body.dr-casino-page .dr-casino-content {{ max-width: 100% !important; }} body.dr-casino-page .dr-casino-content .dr-casino-table {{ width: 100% !important; }} body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table, body.dr-casino-page.dr-legacy-table-casino .dr-casino-content-shell {{ width: 100% !important; max-width: 100% !important; }} {mobile_columns} }}
 </style>
 """
@@ -148,7 +176,19 @@ def _mark_legacy_sidebar_layout(soup: BeautifulSoup) -> None:
 
 def apply_to_soup(soup: BeautifulSoup, policy: dict | None) -> BeautifulSoup:
     """Add scoped layout CSS to casino HTML without touching normal pages."""
-    if not soup.select_one('body.dr-casino-page'):
+    body = soup.body
+    if body is None:
+        return soup
+    classes = list(body.get('class', []))
+    has_wordpress_main_slot = soup.select_one(
+        'body.dr-casino-page #head-menu .dr-navigation[data-dr-layout="wordpress-main-slot"]'
+    ) is not None
+    if has_wordpress_main_slot:
+        classes = list(dict.fromkeys([*classes, 'dr-wordpress-main-slot']))
+    else:
+        classes = [name for name in classes if name != 'dr-wordpress-main-slot']
+    body['class'] = classes
+    if 'dr-casino-page' not in classes:
         return soup
     _mark_legacy_sidebar_layout(soup)
     head = soup.head

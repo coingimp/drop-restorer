@@ -71,10 +71,11 @@
         <div id="metadata-status" class="info"></div>
         <article class="card casino-layout-card">
           <h2>Оформление казино-страниц WordPress</h2>
-          <p id="casino-layout-help" class="muted">Эти параметры применяются только к трём созданным страницам казино и всему их содержимому. Значение <strong>0</strong> у ширины означает всю доступную ширину контейнера; в старой двухколоночной теме боковое меню сохраняется, а контент автоматически сжимается до ширины экрана.</p>
+          <p id="casino-layout-help" class="muted">Ширина контента и главного меню настраивается отдельно и применяется только к страницам казино. На телефонах оболочка и меню автоматически занимают ширину экрана без горизонтального скролла.</p>
           <form id="casino-layout-form">
             <div class="cols">
-              <label>Ширина контента казино, px <small>0 — без ограничения</small><input name="content_width_px" type="number" min="0" max="2400" step="1"></label>
+              <label>Ширина контента казино, px <small>0 — на всю доступную ширину</small><input name="content_width_px" type="number" min="0" max="2400" step="1"></label>
+              <label>Ширина главного меню, px <small>0 — как ширина контента</small><input name="navigation_width_px" type="number" min="0" max="2400" step="1"></label>
               <label>Ширина таблицы офферов, px <small>0 — 100% контента</small><input name="table_width_px" type="number" min="0" max="2400" step="1"></label>
             </div>
             <div class="cols">
@@ -89,7 +90,7 @@
               <label>Рейтинг<input name="cell_rating" type="number" min="0" max="1200" step="1"></label>
               <label>Кнопка<input name="cell_button" type="number" min="0" max="1200" step="1"></label>
             </div>
-            <div class="actions"><button id="save-casino-layout" class="primary" type="submit" data-idle>Сохранить размеры и обновить превью</button><span class="muted">На телефоне ширина автоматически становится 100%, чтобы не появлялся горизонтальный скролл.</span></div>
+            <div class="actions"><button id="save-casino-layout" class="primary" type="submit" data-idle>Сохранить размеры и обновить превью</button><span class="muted">Размеры применяются только к страницам казино; на телефоне ширина автоматически ограничивается экраном.</span></div>
           </form>
         </article>
         <div class="actions card"><button id="keep" class="primary" data-idle>Одобрить без изменений — продолжить</button><button data-tab="agents">Подключить агента для доработки</button><button id="propose" data-idle>Подготовить варианты метаданных</button><button id="apply-meta" data-idle>Применить варианты — продолжить</button><button id="reopen" data-idle>Открыть исходники в новой сборке</button></div>

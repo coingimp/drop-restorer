@@ -62,6 +62,7 @@ class NavigationTests(unittest.TestCase):
         self.assertIsNotNone(menu)
         self.assertNotEqual(menu.get('data-dr-placement'), 'header-fallback')
         self.assertEqual(menu.get('data-dr-layout'), 'wordpress-main-slot')
+        self.assertIn('dr-wordpress-main-slot', soup.body.get('class', []))
         self.assertEqual([a.get_text() for a in menu.select(':scope > #dr-primary-menu > li > a')],
                          ['Startseite', 'Fotografen', 'Kontakt'])
         self.assertEqual(len(menu.select(':scope > #dr-primary-menu > .dr-casino')), 1)

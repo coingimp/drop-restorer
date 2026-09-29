@@ -76,6 +76,7 @@ class WebTests(unittest.TestCase):
         stale_archive.write_bytes(b'old package')
         layout = {
             'content_width_px': 1360,
+            'navigation_width_px': 1280,
             'table_width_px': 1180,
             'row_height_px': 96,
             'cell_padding_px': 8,
@@ -101,10 +102,16 @@ class WebTests(unittest.TestCase):
         regular = next(page for page in build.pages if not page.casino)
         self.assertIn('id="dr-casino-layout"', casino.html)
         self.assertIn('max-width: 1360px', casino.html)
+        self.assertIn('width: min(1360px, calc(100vw - 32px)) !important', casino.html)
+        self.assertIn('width: min(1280px, calc(100vw - 32px)) !important', casino.html)
         self.assertNotIn('id="dr-casino-layout"', regular.html)
         manifest = json.loads((build.root / 'theme' / 'site.json').read_text(encoding='utf-8'))
         self.assertIn('max-width: 1360px', manifest['pages'][casino.key]['head'])
         self.assertNotIn('dr-casino-layout', manifest['pages'][regular.key]['head'])
+        theme_functions = (build.root / 'theme' / 'functions.php').read_text(encoding='utf-8')
+        self.assertIn('navigation_width_px', theme_functions)
+        self.assertIn('dr-wordpress-main-slot .gesamt', theme_functions)
+        self.assertIn('dr-wordpress-main-slot #head-menu', theme_functions)
 
     def preview(self, build):
         response = self.post('/api/preview', {'id': build.root.name})

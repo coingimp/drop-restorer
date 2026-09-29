@@ -87,14 +87,15 @@ function dr_page() {
     return isset($site['pages'][$key]) ? $site['pages'][$key] : null;
 }
 function dr_casino_layout() {
-    $defaults = array('content_width_px'=>1120, 'table_width_px'=>0, 'row_height_px'=>110,
+    $defaults = array('content_width_px'=>1120, 'navigation_width_px'=>0, 'table_width_px'=>0, 'row_height_px'=>110,
                       'cell_padding_px'=>12, 'cell_widths_px'=>array('logo'=>0,'bonus'=>0,'characteristics'=>0,'rating'=>0,'button'=>0));
     $configured = dr_site()['seo_policy']['casino_layout'] ?? array();
     if (!is_array($configured)) { $configured = array(); }
-    foreach (array('content_width_px','table_width_px','row_height_px','cell_padding_px') as $key) {
+    foreach (array('content_width_px','navigation_width_px','table_width_px','row_height_px','cell_padding_px') as $key) {
         if (isset($configured[$key]) && is_numeric($configured[$key])) { $defaults[$key] = (int)$configured[$key]; }
     }
     $defaults['content_width_px'] = max(0,min(2400,$defaults['content_width_px']));
+    $defaults['navigation_width_px'] = max(0,min(2400,$defaults['navigation_width_px']));
     $defaults['table_width_px'] = max(0,min(2400,$defaults['table_width_px']));
     $defaults['row_height_px'] = max(72,min(400,$defaults['row_height_px']));
     $defaults['cell_padding_px'] = max(0,min(32,$defaults['cell_padding_px']));
@@ -108,6 +109,10 @@ function dr_casino_layout_css() {
     $layout = dr_casino_layout();
     $content = $layout['content_width_px'] ? $layout['content_width_px'].'px' : 'none';
     $table = $layout['table_width_px'] ? $layout['table_width_px'].'px' : '100%';
+    $navigation_width = $layout['navigation_width_px'] ?: $layout['content_width_px'];
+    $shell_width = max($layout['content_width_px'], $navigation_width);
+    $shell_css = $shell_width ? 'min('.$shell_width.'px, calc(100vw - 32px))' : 'calc(100% - 32px)';
+    $navigation_css = $navigation_width ? 'min('.$navigation_width.'px, calc(100vw - 32px))' : '100%';
     $columns = array('logo'=>'.casino-row__logo','bonus'=>'.casino-row__bonus','characteristics'=>'.casino-row__characteristics','rating'=>'.casino-row__rating','button'=>'.casino-row__button');
     $css = 'body.dr-casino-page .dr-casino-content{box-sizing:border-box!important;width:100%!important;max-width:'.$content.'!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page .dr-legacy-layout-table{box-sizing:border-box;width:100%!important;max-width:100%!important;}body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table{width:auto!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-legacy-table-casino .dr-casino-content-shell{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;margin-left:auto!important;margin-right:auto!important;table-layout:auto!important;}body.dr-casino-page.dr-legacy-table-casino .dr-casino-content-shell>tbody>tr>td.dr-casino-content{box-sizing:border-box!important;width:100%!important;max-width:100%!important;min-width:0!important;background-repeat:no-repeat!important;background-size:100% 100%!important;}body.dr-casino-page.dr-legacy-table-casino .dr-casino-content{width:100%!important;max-width:100%!important;}'
          . 'body.dr-casino-page .dr-casino-content .dr-casino-table{--dr-casino-table-width:'.$table.';--dr-offer-row-height:'.$layout['row_height_px'].'px;--dr-casino-cell-padding:'.$layout['cell_padding_px'].'px;}'
@@ -120,6 +125,8 @@ function dr_casino_layout_css() {
     foreach ($columns as $key => $selector) {
         if ($layout['cell_widths_px'][$key]) { $mobile .= 'body.dr-casino-page .dr-casino-content .dr-casino-table '.$selector.'{width:auto!important;}'; }
     }
+    $css .= '@media(min-width:801px){body.dr-casino-page.dr-wordpress-main-slot .gesamt{box-sizing:border-box!important;width:'.$shell_css.'!important;max-width:calc(100vw - 32px)!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-wordpress-main-slot .header{position:relative!important;width:100%!important;}body.dr-casino-page.dr-wordpress-main-slot .header_image{display:block!important;max-width:100%!important;height:auto!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-wordpress-main-slot .header .logo,body.dr-casino-page.dr-wordpress-main-slot .header .slogan{left:max(0px,calc((100% - 1000px)/2))!important;}body.dr-casino-page.dr-wordpress-main-slot #head-menu{box-sizing:border-box!important;width:'.$navigation_css.'!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-wordpress-main-slot #head-menu .main-width{box-sizing:border-box!important;width:100%!important;max-width:100%!important;margin-left:auto!important;margin-right:auto!important;}}'
+         . '@media(max-width:800px){body.dr-casino-page.dr-wordpress-main-slot .gesamt{box-sizing:border-box!important;width:100%!important;max-width:100vw!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-wordpress-main-slot .header{position:relative!important;width:100%!important;}body.dr-casino-page.dr-wordpress-main-slot .header_image{display:block!important;width:100%!important;max-width:100%!important;height:auto!important;margin-left:auto!important;margin-right:auto!important;}body.dr-casino-page.dr-wordpress-main-slot .header .logo,body.dr-casino-page.dr-wordpress-main-slot .header .slogan{left:0!important;max-width:calc(100% - 32px)!important;margin-left:16px!important;}body.dr-casino-page.dr-wordpress-main-slot #head-menu{box-sizing:border-box!important;width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;margin-top:0!important;}body.dr-casino-page.dr-wordpress-main-slot #head-menu .main-width,body.dr-casino-page.dr-wordpress-main-slot #head-menu .dr-navigation{box-sizing:border-box!important;width:100%!important;max-width:100%!important;height:auto!important;min-height:0!important;}body.dr-casino-page.dr-wordpress-main-slot #dr-primary-menu{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;}}';
     return '<style id="dr-casino-layout">'.$css.'@media(max-width:768px){body.dr-casino-page .dr-casino-content{max-width:100%!important;}body.dr-casino-page .dr-casino-content .dr-casino-table{width:100%!important;}body.dr-casino-page.dr-legacy-table-casino .dr-legacy-layout-table,body.dr-casino-page.dr-legacy-table-casino .dr-casino-content-shell{width:100%!important;max-width:100%!important;}'.$mobile.'}</style>';
 }
 function dr_has_seo_plugin() {

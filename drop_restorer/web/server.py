@@ -526,10 +526,13 @@ def create_app(workspace: Path, port=8780):
                 requested = values.get('layout')
                 if not isinstance(requested, dict):
                     raise RestorationError('Передайте настройки размеров казино.')
-                fields = (('content_width_px', 0, 2400), ('table_width_px', 0, 2400),
+                fields = (('content_width_px', 0, 2400), ('navigation_width_px', 0, 2400),
+                          ('table_width_px', 0, 2400),
                           ('row_height_px', 72, 400), ('cell_padding_px', 0, 32))
                 for key, low, high in fields:
-                    value = requested.get(key)
+                    # Existing clients from before the independent menu-width
+                    # control omitted this optional value; zero follows content.
+                    value = requested.get(key, 0 if key == 'navigation_width_px' else None)
                     if isinstance(value, bool) or not isinstance(value, int) or not low <= value <= high:
                         raise RestorationError(f'Параметр {key} должен быть целым числом от {low} до {high}.')
                 widths = requested.get('cell_widths_px')

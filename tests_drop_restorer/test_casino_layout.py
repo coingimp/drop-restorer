@@ -12,10 +12,13 @@ class CasinoLayoutTests(unittest.TestCase):
                                    'row_height_px': 1, 'cell_padding_px': 99,
                                    'cell_widths_px': {'logo': 99999}})
         self.assertEqual(layout['content_width_px'], 2400)
+        self.assertEqual(layout['navigation_width_px'], 0)
         self.assertEqual(layout['table_width_px'], 0)
         self.assertEqual(layout['row_height_px'], 72)
         self.assertEqual(layout['cell_padding_px'], 32)
         self.assertEqual(layout['cell_widths_px']['logo'], 1200)
+        self.assertEqual(normalize_layout({'navigation_width_px': -1})['navigation_width_px'], 0)
+        self.assertEqual(normalize_layout({'navigation_width_px': 99999})['navigation_width_px'], 2400)
 
     def test_css_is_scoped_to_casino_pages(self):
         html = '<html><head></head><body><main class="dr-casino-content"><div id="dr-editor-content"></div></main></body></html>'
@@ -60,6 +63,26 @@ class CasinoLayoutTests(unittest.TestCase):
         self.assertIn('width: calc(100% - 32px) !important', css)
         self.assertIn('flex: 1 1 auto !important', css)
         self.assertIn('width: auto !important', css)
+
+    def test_wordpress_main_menu_and_shell_follow_independent_width_and_mobile_clamp(self):
+        css = css_for_layout({'content_width_px': 1500, 'navigation_width_px': 1400})
+        self.assertIn('body.dr-casino-page.dr-wordpress-main-slot .gesamt', css)
+        self.assertIn('width: min(1500px, calc(100vw - 32px)) !important', css)
+        self.assertIn('#head-menu { box-sizing: border-box !important; width: min(1400px, calc(100vw - 32px))', css)
+        self.assertIn('@media (max-width: 768px)', css)
+        self.assertIn('.gesamt { box-sizing: border-box !important; width: 100% !important; max-width: 100vw !important', css)
+        self.assertIn('#head-menu { box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; height: auto !important', css)
+        self.assertIn('#dr-primary-menu { position: relative !important; inset: auto !important', css)
+        self.assertIn('@media (max-width: 800px)', css)
+        self.assertNotIn('dr-wordpress-main-slot .gesamt', css_for_layout({'content_width_px': 1500}).split('@media')[0])
+
+    def test_existing_wordpress_main_slot_is_marked_for_scoped_casino_width_rules(self):
+        soup = BeautifulSoup('''<html><head></head><body class="home dr-casino-page"><div class="gesamt">
+          <nav id="head-menu"><div class="main-width"><div class="dr-navigation" data-dr-layout="wordpress-main-slot"></div></div></nav>
+          <main class="dr-casino-content"></main></div></body></html>''', 'html.parser')
+        apply_to_soup(soup, {'casino_layout': {'content_width_px': 1500, 'navigation_width_px': 1500}})
+        self.assertIn('dr-wordpress-main-slot', soup.body['class'])
+        self.assertIn('width: min(1500px, calc(100vw - 32px)) !important', soup.select_one('#dr-casino-layout').text)
 
     def test_legacy_table_content_shell_fills_donor_width_for_offer_table(self):
         css = css_for_layout(default_layout())
