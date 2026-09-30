@@ -10,7 +10,7 @@ import webbrowser
 from bs4 import BeautifulSoup
 import requests
 
-from ..runtime import python_executable
+from ..runtime import python_executable, workspace_root
 
 
 def main():
@@ -19,7 +19,7 @@ def main():
     parser.add_argument('--project', type=Path)
     parser.add_argument('--no-browser', action='store_true')
     args = parser.parse_args()
-    workspace = Path(__file__).resolve().parents[2]
+    workspace = workspace_root(__file__)
     origin = f'http://127.0.0.1:{args.port}'
     session = requests.Session()
     session.trust_env = False

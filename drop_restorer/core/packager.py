@@ -6,10 +6,208 @@ import re
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import quote, unquote, urlsplit
 
 from .models import RestorationError
 from .audit import audit, require_pass
 from .theme_identity import theme_identity
+
+
+def _static_file_for_route(route: str) -> str:
+    parsed = urlsplit(route)
+    if parsed.query or parsed.fragment:
+        raise RestorationError('Для статической HTML-сборки задайте чистые URL без параметров и фрагментов: ' + route)
+    path = unquote(parsed.path or '/')
+    if not path.startswith('/') or '\\' in path or any(ord(char) < 32 for char in path):
+        raise RestorationError('Небезопасный путь для HTML-файла: ' + route)
+    raw_segments = path.strip('/').split('/') if path.strip('/') else []
+    if any(not part or part in ('.', '..') or any(char in '<>:"|?*' for char in part)
+           or part.endswith(('.', ' ')) or re.fullmatch(r'(?i)(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?', part)
+           for part in raw_segments):
+        raise RestorationError('Путь страницы нельзя безопасно сохранить в ZIP: ' + route)
+    if raw_segments and raw_segments[0].casefold() == 'assets':
+        raise RestorationError('Путь страницы конфликтует с папкой ресурсов статического сайта: ' + route)
+    if len(raw_segments) == 1 and raw_segments[0].casefold() in {
+        '404.html', 'robots.txt', 'sitemap.xml', '.htaccess', '_redirects', 'readme.md'
+    }:
+        raise RestorationError('Путь совпадает со служебным файлом статического сайта: ' + route)
+    if not raw_segments:
+        return 'index.html'
+    if path.endswith('/'):
+        return '/'.join(raw_segments + ['index.html'])
+    if re.search(r'\.[a-zA-Z0-9]{1,8}$', raw_segments[-1]):
+        return '/'.join(raw_segments)
+    return '/'.join(raw_segments + ['index.html'])
+
+
+def _static_redirects(build):
+    redirects = dict(build.seo_policy.get('redirects', {}))
+    pages = []
+    for page in build.pages:
+        route = page.route
+        parsed = urlsplit(route)
+        if parsed.query or parsed.fragment:
+            raise RestorationError('Статический HTML не может обслужить URL с параметрами. Задайте этой странице чистый путь в плане URL: ' + route)
+        path = parsed.path or '/'
+        if path == '/' or re.search(r'\.[a-zA-Z0-9]{1,8}$', path.rstrip('/')):
+            pages.append((path, _static_file_for_route(route)))
+            continue
+        alternate = path.rstrip('/') if path.endswith('/') else path + '/'
+        if build.seo_policy.get('url_style', 'slash') == 'slash':
+            redirects.setdefault(alternate, path.rstrip('/') + '/')
+        else:
+            redirects.setdefault(alternate, path.rstrip('/'))
+        pages.append((path, _static_file_for_route(route)))
+    available = {urlsplit(route).path or '/' for route, _ in pages}
+    for source, target in redirects.items():
+        old = urlsplit(source)
+        new = urlsplit(target)
+        if old.query or old.fragment or new.query or new.fragment:
+            raise RestorationError('Для HTML-сборки найдена переадресация со старого URL с параметрами. Задайте чистые пути в плане URL или выберите WordPress: ' + source)
+        if old.scheme or old.netloc or new.scheme or new.netloc or not old.path.startswith('/') or not new.path.startswith('/'):
+            raise RestorationError('HTML-редиректы должны использовать внутренние пути сайта: ' + source + ' → ' + target)
+        _static_file_for_route(old.path)
+        _static_file_for_route(new.path)
+        canonical_target = new.path.rstrip('/') or '/'
+        if canonical_target not in {path.rstrip('/') or '/' for path in available}:
+            raise RestorationError('HTML-редирект ведёт на отсутствующую страницу: ' + source + ' → ' + target)
+    return redirects, pages
+
+
+def _static_rules(build, redirects, pages):
+    rules = ['Options -MultiViews', 'DirectoryIndex index.html', 'ErrorDocument 404 /404.html', 'RewriteEngine On']
+    netlify = []
+    for source, target in sorted(redirects.items(), key=lambda pair: (-len(pair[0]), pair[0])):
+        if source == target:
+            continue
+        source_path = urlsplit(source).path.lstrip('/')
+        target_path = urlsplit(target).path or '/'
+        pattern = re.escape(unquote(source_path)).replace(r'\ ', r'\x20')
+        rules.append('RewriteRule ^' + pattern + '$ ' + target_path + ' [R=301,L,NE]')
+        netlify.append(source + ' ' + target_path + ' 301!')
+    for route, file_path in pages:
+        path = urlsplit(route).path or '/'
+        if path == '/' or re.search(r'\.[a-zA-Z0-9]{1,8}$', path.rstrip('/')):
+            continue
+        visible = path.rstrip('/')
+        pattern = re.escape(unquote(visible.lstrip('/'))).replace(r'\ ', r'\x20')
+        static_target = quote(file_path, safe='/-._~')
+        rules.append('RewriteRule ^' + pattern + '/?$ ' + static_target + ' [END]')
+        netlify.append(visible + ('/' if route.endswith('/') else '') + ' ' + static_target + ' 200!')
+    return '\n'.join(rules) + '\n', '\n'.join(netlify) + '\n'
+
+
+def _validate_static_zip(path: Path, build, expected_pages):
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = archive.namelist()
+            if not names or len(names) != len(set(names)) or any(
+                name.startswith('/') or '\\' in name or any(part in ('', '.', '..') for part in name.split('/'))
+                for name in names
+            ):
+                raise RestorationError('HTML ZIP содержит повторяющиеся или небезопасные пути.')
+            if any(name.lower().endswith(('.php', '.xml.gz')) or name.lower() in ('content.xml', 'site.json') for name in names):
+                raise RestorationError('В HTML ZIP попали файлы WordPress или пакет импорта.')
+            if any(name.endswith('.php') or name.startswith(('theme/', 'wp-content/')) for name in names):
+                raise RestorationError('В HTML ZIP обнаружены файлы WordPress.')
+            required = {'index.html', '404.html', 'robots.txt', 'sitemap.xml', '.htaccess', '_redirects', 'README.md'}
+            if not required.issubset(set(names)):
+                raise RestorationError('В HTML ZIP отсутствуют обязательные страницы или правила сайта.')
+            missing = set(expected_pages) - set(names)
+            if missing:
+                raise RestorationError('В HTML ZIP не попали страницы: ' + ', '.join(sorted(missing)[:5]))
+            for page_name in expected_pages:
+                source = archive.read(page_name).decode('utf-8-sig', errors='replace')
+                for meta in re.findall(r'(?is)<meta\b[^>]*>', source):
+                    if re.search(r'(?i)\bnoindex\b', meta):
+                        raise RestorationError('В статической странице сохранился запрет индексации: ' + page_name)
+                for asset in re.findall(r'''(?i)(?:src|href|poster)\s*=\s*["'](/assets/[^"'?#]+)''', source):
+                    if unquote(asset.lstrip('/')) not in names:
+                        raise RestorationError('Не найден ресурс статической страницы: ' + asset)
+            if archive.testzip() is not None:
+                raise RestorationError('Контроль целостности HTML ZIP не пройден.')
+            return {'passed': True, 'kind': 'static_html', 'pages': len(expected_pages), 'files': len(names),
+                    'checks': ['html_routes', 'assets_included', '404_page', 'robots_and_sitemap',
+                               'static_host_rules', 'no_wordpress_or_xml', 'safe_unique_paths', 'zip_crc']}
+    except zipfile.BadZipFile as error:
+        raise RestorationError('Повреждён архив статического сайта.') from error
+
+
+def _package_static_html(build, destination, report, seo_report):
+    from .seo_routes import robots, sitemap
+    from .theme_identity import not_found_document
+    redirects, routes = _static_redirects(build)
+    theme_root = build.root / 'theme'
+    assets_root = build.root / 'theme' / 'assets'
+    pages_root = build.root / 'pages'
+    if (theme_root.is_symlink() or not assets_root.is_dir() or assets_root.is_symlink()
+            or pages_root.is_symlink() or not pages_root.is_dir()):
+        raise RestorationError('Не найдены HTML-страницы или ресурсы статического сайта, либо обнаружена ссылка на внешний путь.')
+    page_files = []
+    for page in build.pages:
+        source = build.root / 'pages' / (page.key + '.html')
+        if source.is_symlink() or not source.is_file():
+            raise RestorationError('Не найден HTML восстановленной страницы: ' + page.route)
+        page_files.append((source, _static_file_for_route(page.route)))
+    route_names = [target for _, target in page_files]
+    folded = [name.casefold() for name in route_names]
+    if len(folded) != len(set(folded)):
+        raise RestorationError('Две страницы совпали по имени файла в ZIP. Измените URL в плане сайта.')
+    if any(path.is_symlink() for folder in (build.root / 'pages', assets_root)
+           for path in folder.rglob('*')):
+        raise RestorationError('В файлах сайта обнаружена ссылка на внешний файл.')
+    css_path = assets_root / 'site-404.css'
+    css = css_path.read_text(encoding='utf-8') if css_path.is_file() else ''
+    apache, netlify = _static_rules(build, redirects, routes)
+    readme = (
+        '# Статический сайт\n\n'
+        'Распакуйте содержимое ZIP в корневую папку домена или статического хостинга. Главная страница — `index.html`; '
+        'архивные и казино-страницы сохранены по выбранным URL; файлы оформления и изображений находятся в `assets/`.\n\n'
+        '`robots.txt`, `sitemap.xml` и оформленная `404.html` уже включены. Правила 301 и маршрутизация сохранены в '
+        '`.htaccess` для Apache и `_redirects` для Netlify/Cloudflare Pages. Для другого сервера перенесите правила из '
+        'этих файлов в его конфигурацию. Размещение рассчитано на корень домена; при смене домена обновите canonical '
+        'в страницах и адрес sitemap.\n'
+    )
+    destination = destination.with_suffix('.zip')
+    if destination.exists():
+        raise RestorationError('Файл уже существует. Выберите новое имя архива.')
+    created = False
+    try:
+        with destination.open('xb') as output:
+            created = True
+            with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                for source, name in page_files:
+                    archive.write(source, name)
+                for source in sorted(assets_root.rglob('*')):
+                    if source.is_file():
+                        archive.write(source, 'assets/' + source.relative_to(assets_root).as_posix())
+                archive.writestr('404.html', not_found_document(build.request.origin, build.request.lang, css))
+                archive.writestr('robots.txt', robots(build))
+                archive.writestr('sitemap.xml', sitemap(build))
+                archive.writestr('.htaccess', apache)
+                archive.writestr('_redirects', netlify)
+                archive.writestr('README.md', readme)
+                if build.digest() != build.approved_digest:
+                    raise RestorationError('Файлы изменились во время упаковки. Повторите просмотр.')
+        install_checks = _validate_static_zip(destination, build, route_names)
+        if build.digest() != build.approved_digest:
+            raise RestorationError('Файлы изменились во время упаковки. Повторите просмотр.')
+        report['output_format'] = 'static_html'
+        report['static_package'] = install_checks
+        receipt = {'approved_at': datetime.now(timezone.utc).isoformat(), 'digest': build.approved_digest,
+                   'format': 'static-html-v1', 'archive': str(destination), 'pages': len(build.pages),
+                   'owner_approvals': build.owner_approvals, 'install_checks': install_checks,
+                   'sha256': {destination.name: hashlib.sha256(destination.read_bytes()).hexdigest()}}
+        from .seo_contract import save_json
+        save_json(build.root / 'approval.json', receipt)
+        save_json(build.root / 'static-install-checks.json', install_checks)
+        save_json(build.root / 'seo-checklist.json', seo_report)
+        save_json(build.root / 'checks.json', report)
+        return destination
+    except Exception:
+        if created and destination.is_file():
+            destination.unlink()
+        raise
 
 
 def bundle_path(theme_zip: Path) -> Path:
@@ -144,12 +342,14 @@ def package(build, destination: Path) -> Path:
     accepted=(owner.get('by')=='owner' and owner.get('digest')==build.approved_digest
               and owner.get('fingerprint')==fingerprint(build))
     seo_report = inspect_site(build) if accepted else require_checklist(build)
+    report = audit(build) if accepted else require_pass(build)
+    if build.request.output_format == 'static_html':
+        return _package_static_html(build, destination, report, seo_report)
     destination = destination.with_suffix('.zip')
     bundle = bundle_path(destination)
     content = content_path(destination)
     if any(p.exists() for p in (destination, bundle, content)):
         raise RestorationError('Файл уже существует. Выберите новое имя архива.')
-    report = audit(build) if accepted else require_pass(build)
     identity = theme_identity(build.request.origin)
     selected = []
     for folder in ('theme', 'pages', 'preview_screenshots'):

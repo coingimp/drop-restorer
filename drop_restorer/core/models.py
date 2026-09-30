@@ -107,7 +107,7 @@ class CasinoPage:
 
     @property
     def route(self) -> str:
-        # Casino articles live under one stable section.  Keep the editable
+        # Casino articles live under one stable section. Keep the editable
         # value as the leaf slug, while the public URL is always hierarchical.
         return latin_url_path('/casino/' + self.slug.strip('/') + '/')
 
@@ -127,8 +127,11 @@ class RestoreRequest:
     final_domain: str = ''
     casino_pages: list[CasinoPage] = field(default_factory=lambda: list(DEFAULT_CASINO))
     casino_label: str = 'Казино'
+    output_format: str = 'wordpress'
 
     def validate(self) -> list[Snapshot]:
+        if self.output_format not in ('wordpress', 'static_html'):
+            raise RestorationError('Выберите формат результата: WordPress или статический HTML.')
         if not self.menu_pages:
             raise RestorationError('Добавьте хотя бы одну архивную страницу меню.')
         snapshots = [Snapshot.parse(x) for x in [self.main_page, *self.menu_pages]]
@@ -214,6 +217,8 @@ class Build:
 
     def digest(self) -> str:
         digest = hashlib.sha256()
+        if self.request.output_format != 'wordpress':
+            digest.update(self.request.output_format.encode('utf-8'))
         if self.seo_policy:
             digest.update(json.dumps(self.seo_policy, ensure_ascii=False, sort_keys=True).encode())
         for folder in ('theme', 'pages'):

@@ -222,6 +222,16 @@ class AssetDownloader:
             else:
                 for attr in ('src', 'poster', 'background', 'data-src', 'data-lazy-src'):
                     if node.get(attr):
+                        if (node.name == 'img' and attr == 'src'
+                                and '/tree/' in str(node[attr]).casefold()):
+                            # Keep the original STRATO tree-button provenance
+                            # after replacing the archived URL with a local
+                            # hashed asset. The navigation cleaner runs after
+                            # localization and still needs to distinguish the
+                            # vertical sidebar from an ordinary image table.
+                            anchor = node.find_parent('a')
+                            if anchor is not None:
+                                anchor['data-dr-legacy-tree-button'] = '1'
                         value = self.fetch(node[attr], snapshot, 'image' if node.name in ('img', 'input') or attr == 'poster' else '')
                         if value:
                             node[attr] = value

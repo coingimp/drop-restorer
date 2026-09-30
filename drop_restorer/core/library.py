@@ -61,6 +61,7 @@ def load_card(root: Path):
     title = str(home.get('seo_title') or home.get('title') or origin or 'Незавершённая сборка').strip()
     status = data.get('status', 'incomplete') if request else 'incomplete'
     return {'id': root.name, 'status': status, 'title': title, 'pages': len(pages), 'origin': origin,
+            'output_format': request.get('output_format', 'wordpress'),
             'url': origin + str(home.get('route') or '/') if origin else '',
             'can_open': bool(request), 'home': home}
 

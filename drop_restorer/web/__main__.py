@@ -10,6 +10,7 @@ import sys
 import traceback
 
 from .service import AlreadyRunning, server_lock
+from ..runtime import workspace_root
 
 
 def main():
@@ -20,7 +21,7 @@ def main():
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error('Port must be between 1024 and 65535.')
-    workspace = Path(__file__).resolve().parents[2]
+    workspace = workspace_root(__file__)
     try:
         with server_lock(workspace, args.port):
             if args.background:

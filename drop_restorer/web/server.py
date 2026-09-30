@@ -173,7 +173,17 @@ class Workspace:
 
     def saved_package(self, build):
         receipt = read_json(build.root / 'approval.json', {})
-        if build.status != 'ready' or receipt.get('format') != 'wordpress-theme-v1' or receipt.get('digest') != build.digest():
+        if build.status != 'ready' or receipt.get('digest') != build.digest():
+            return None
+        if receipt.get('format') == 'static-html-v1':
+            original = Path(receipt.get('archive', ''))
+            path = original.resolve()
+            if (original.is_symlink() or path.parent != build.root.resolve() or not path.is_file()
+                    or hashlib.sha256(path.read_bytes()).hexdigest() != receipt.get('sha256', {}).get(path.name)):
+                return None
+            return {**self.register_file(path), 'kind': 'static_html', 'pages': receipt.get('pages'),
+                    'install_checks': receipt.get('install_checks')}
+        if receipt.get('format') != 'wordpress-theme-v1':
             return None
         artifacts = {}
         for key in ('archive', 'bundle', 'content'):
@@ -484,7 +494,8 @@ def create_app(workspace: Path, port=8780):
                     report = audit(build)
                     with state.lock:
                         state.report = report
-                state.start('Проверяем сайт и экспорт WordPress…', check)
+                state.start('Проверяем страницы и HTML ZIP…' if build.request.output_format == 'static_html'
+                            else 'Проверяем сайт и экспорт WordPress…', check)
             elif action == 'branding':
                 if build.status not in ('site_review','ready'):
                     raise RestorationError('Сначала подготовьте сайт.')
@@ -611,7 +622,8 @@ def create_app(workspace: Path, port=8780):
             def pack():
                 approve(build, digest, accept_findings=accept_findings)
                 from ..core.theme_identity import theme_identity
-                name = theme_identity(build.request.origin).slug + '-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3) + '.zip'
+                suffix = '-html-' if build.request.output_format == 'static_html' else '-'
+                name = theme_identity(build.request.origin).slug + suffix + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3) + '.zip'
                 path = package(build, build.root / name)
                 with state.lock:
                     state.archive = state.saved_package(build)
@@ -629,11 +641,13 @@ def create_app(workspace: Path, port=8780):
                 raise RestorationError('Сначала одобрите текущую версию в превью.')
             def repack():
                 from ..core.theme_identity import theme_identity
-                name = theme_identity(build.request.origin).slug + '-' + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3) + '.zip'
+                suffix = '-html-' if build.request.output_format == 'static_html' else '-'
+                name = theme_identity(build.request.origin).slug + suffix + datetime.now().strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(3) + '.zip'
                 package(build, build.root / name)
                 with state.lock:
                     state.archive = state.saved_package(build)
-            state.start('Создаём установочный ZIP уже одобренной темы…', repack)
+            state.start('Создаём ZIP уже одобренного статического сайта…' if build.request.output_format == 'static_html'
+                        else 'Создаём установочный ZIP уже одобренной темы…', repack)
         return jsonify(accepted=True), 202
 
     @app.get('/api/page/<identifier>/<key>')
@@ -645,7 +659,10 @@ def create_app(workspace: Path, port=8780):
                 raise RestorationError('Сначала подготовьте сайт.')
             page = next((p for p in build.pages if p.key == key and not p.casino), None)
             if not page:
-                raise RestorationError('Правка доступна для восстановленных страниц. Казино заполняется в WordPress.')
+                message = ('Казино-страницы этой сборки поставляются отдельными HTML-файлами для ручного редактирования.'
+                           if build.request.output_format == 'static_html'
+                           else 'Правка доступна для восстановленных страниц. Казино заполняется в WordPress.')
+                raise RestorationError(message)
             from ..core.seo_contract import fingerprint
             return jsonify(html=(build.root / 'pages' / (page.key + '.html')).read_text(encoding='utf-8'), digest=fingerprint(build) if build.status=='site_review' else build.digest())
 
@@ -757,12 +774,12 @@ def create_app(workspace: Path, port=8780):
         with state.lock:
             state.idle()
             build = state.current(values.get('id'))
-            allowed = ['checks.json', 'metadata-review.json', 'metadata-sample.json', 'run.log','seo-checklist.json','visual-checks.json','affiliate-manifest.json','checklist-agent.json']
+            allowed = ['checks.json', 'metadata-review.json', 'metadata-sample.json', 'run.log','seo-checklist.json','static-install-checks.json','visual-checks.json','affiliate-manifest.json','checklist-agent.json']
             paths = [build.root / name for name in allowed]
             paths += sorted((build.root / 'preview_screenshots').glob('*.png'))
             paths += sorted((build.root / 'checklist-screenshots').glob('*.png'))
             package = state.saved_package(build)
-            current_package_names = ({package['name'], package['bundle']['name']}
+            current_package_names = ({package['name']} | ({package['bundle']['name']} if package.get('bundle') else set())
                                      if package else set())
             paths += [path for path in sorted(build.root.glob('*.zip')) if path.name in current_package_names]
             return jsonify([state.register_file(p) for p in paths if p.is_file()])

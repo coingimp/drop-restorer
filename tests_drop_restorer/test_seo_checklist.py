@@ -129,7 +129,7 @@ class SeoChecklistTests(unittest.TestCase):
         manifest['offers'][0]['target']='https://example.com/?x=2'
         save_json(path,manifest);self.assertNotEqual(before,fingerprint(self.build))
 
-    def test_owner_acceptance_preserves_failures_and_missing_browser_evidence(self):
+    def test_owner_acceptance_preserves_findings_without_reusing_stale_review_after_theme_generation(self):
         self.build.pages[0].html=self.build.pages[0].html.replace('</head>','<title>Duplicate</title></head>')
         write_staging(self.build)
         before=inspect_site(self.build)
@@ -140,11 +140,14 @@ class SeoChecklistTests(unittest.TestCase):
         restored=Build.load(self.build.root)
         report=inspect_site(restored)
         self.assertEqual(restored.status,'ready')
-        self.assertTrue(report['can_build'])
+        # The accepted report allowed this build, but theme generation changes
+        # the reviewed output fingerprint. A later packaging step must review it again.
+        self.assertFalse(report['can_build'])
         self.assertFalse(report['checks_passed'])
         self.assertEqual(before['counts'],report['counts'])
-        self.assertEqual(report['owner_approval']['by'],'owner')
-        self.assertTrue(report['owner_approval']['unresolved'])
+        self.assertIsNone(report['owner_approval'])
+        self.assertEqual(restored.owner_approvals['site_review']['fingerprint'],before['fingerprint'])
+        self.assertTrue(restored.owner_approvals['site_review']['unresolved'])
         self.assertTrue((restored.root/'content.xml').is_file())
         runtime=json.loads((restored.root/'theme/site.json').read_text(encoding='utf-8'))
         self.assertNotIn('owner_approvals',runtime)

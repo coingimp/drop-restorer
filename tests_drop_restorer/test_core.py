@@ -15,10 +15,30 @@ from drop_restorer.core.packager import approve, package
 from drop_restorer.core.theme_identity import theme_identity
 from drop_restorer.core.wordpress import NS, write_site
 from drop_restorer.core.downloader import ArchiveClient
-from drop_restorer.core.assets import original_url
+from drop_restorer.core.assets import AssetDownloader, original_url
 from drop_restorer.agents.client import AgentClient, AgentConfig
 from drop_restorer.preview.server import PreviewServer
 from tests_drop_restorer.fixtures import FixtureArchive, STAMP, request, completed_fixture
+
+
+class AssetLocalizationTests(unittest.TestCase):
+    def test_localized_strato_tree_image_keeps_navigation_provenance(self):
+        class ImageClient:
+            def get(self, url, **kwargs):
+                return b'png-fixture', 'image/png'
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            soup = BeautifulSoup(
+                '<a href="/about/"><img src="mediapool/71/tree/button.png" alt=""></a>',
+                'html.parser',
+            )
+            downloader = AssetDownloader(root, ImageClient(), lambda message: None)
+            downloader.localize(soup, Snapshot(STAMP, 'http://wolfsgehege-merzig.de/'))
+
+            anchor = soup.select_one('a[href]')
+            self.assertEqual(anchor.get('data-dr-legacy-tree-button'), '1')
+            self.assertTrue(anchor.find('img')['src'].startswith('/assets/media/'))
 
 
 class InputTests(unittest.TestCase):
@@ -309,7 +329,7 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(RestorationError):
             package(self.build, target)
         digest = self.build.digest()
-        approve(self.build, digest)
+        approve(self.build, digest, accept_findings=True)
         asset = self.build.root / 'theme' / 'style.css'
         original = asset.read_bytes()
         asset.write_bytes(original + b'/* changed */')
@@ -317,7 +337,7 @@ class PipelineTests(unittest.TestCase):
             package(self.build, target)
         with self.assertRaises(RestorationError):
             approve(self.build, digest)
-        approve(self.build, self.build.digest())
+        approve(self.build, self.build.digest(), accept_findings=True)
         package(self.build, target)
         with zipfile.ZipFile(target) as archive:
             self.assertIn('restoredexample-theme/style.css', archive.namelist())

@@ -336,8 +336,8 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
     # A site's primary navigation is distinct from sidebars, mega-menu columns
     # and footer lists. Never populate every list with the whole site.
     from .primary_navigation import (HEADER, legacy_dynamic_primary, legacy_flash_primary,
-                                     legacy_sidebar_target, legacy_table_primary, select_primary,
-                                     secondary_context)
+                                     legacy_sidebar_target, legacy_table_primary, legacy_tree_sidebar,
+                                     select_primary, secondary_context)
     # Capture donor labels before legacy table/Flash placeholders are cleared.
     # ``label_overrides`` is used by the exporter when a checkpoint already
     # contains a generated menu and the raw source is still available.
@@ -348,6 +348,12 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
     dynamic_primary, dynamic_donor = legacy_dynamic_primary(soup)
     primary = flash_primary or select_primary(soup)
     legacy_menu, legacy_host = legacy_table_primary(soup)
+    legacy_tree_layout = bool(
+        legacy_host is not None and
+        (legacy_tree_sidebar(legacy_host)
+         or legacy_menu is not None
+         and legacy_menu.get('data-dr-placement') == 'legacy-sidebar-menu')
+    )
     # Dreamweaver-era image navigation has no semantic menu for
     # ``select_primary`` to recognise. Replace the obsolete button table in
     # its original strip below the banner so the generated menu does not jump
@@ -359,9 +365,15 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
     elif (primary is None or primary.get('data-dr-placement') == 'header-fallback') and legacy_host is not None:
         if primary is not None:
             primary.decompose()
-        primary = soup.new_tag('nav', attrs={'aria-label': 'Main navigation',
-                                             'data-dr-placement': 'legacy-table-menu',
-                                             'data-dr-layout': 'legacy-table'})
+        primary = soup.new_tag('nav', attrs={
+            'aria-label': 'Main navigation',
+            'data-dr-placement': ('legacy-sidebar-menu' if legacy_tree_layout else 'legacy-table-menu'),
+            'data-dr-layout': ('legacy-sidebar' if legacy_tree_layout else 'legacy-table'),
+        })
+        if legacy_tree_layout:
+            legacy_host['class'] = list(dict.fromkeys([
+                *legacy_host.get('class', []), 'dr-legacy-sidebar-column'
+            ]))
         legacy_host.clear()
         legacy_host.append(primary)
         shell_tables = [node for node in legacy_host.parents if getattr(node, 'name', None) == 'table']
@@ -370,7 +382,10 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
             for table in shell_table.find_all('table'):
                 table['class'] = list(dict.fromkeys([*table.get('class', []), 'dr-legacy-layout-table']))
             shell_table['class'] = list(dict.fromkeys([*shell_table.get('class', []), 'dr-legacy-width-table']))
-        soup.body['class'] = list(dict.fromkeys([*soup.body.get('class', []), 'dr-legacy-table-layout']))
+        body_classes = [*soup.body.get('class', []), 'dr-legacy-table-layout']
+        if legacy_tree_layout:
+            body_classes.append('dr-legacy-sidebar-navigation')
+        soup.body['class'] = list(dict.fromkeys(body_classes))
     if flash_host is not None and flash_primary is None:
         primary = soup.new_tag('nav', attrs={'aria-label': 'Main navigation',
                                              'data-dr-placement': 'legacy-flash-menu',
@@ -520,6 +535,8 @@ def navigation(soup, pages: list[Page], request: RestoreRequest, label_overrides
     primary.extend([toggle, menu])
     if dynamic_donor is not None and dynamic_donor is not primary and primary not in dynamic_donor.descendants:
         dynamic_donor.decompose()
+    for marker in list(soup.select('[data-dr-legacy-tree-button]')):
+        marker.attrs.pop('data-dr-legacy-tree-button', None)
     for node in list(soup.select('link[href="/assets/drop-restorer.css"], script[src="/assets/drop-restorer.js"], link[href="/assets/site-navigation.css"], script[src="/assets/site-navigation.js"]')):
         node.decompose()
     for path, kind in [('/assets/site-navigation.css', 'css'), ('/assets/site-navigation.js', 'js')]:
@@ -742,7 +759,9 @@ def _remove_legacy_table_sidebars(soup, main, primary):
     for cell in list(cells):
         if cell is main:
             continue
-        if cell.find('.dr-navigation') or (primary is not None and (cell is primary or primary in cell.descendants)):
+        if (cell.find('.dr-navigation')
+                or (primary is not None and (cell is primary or primary in cell.descendants))
+                or (legacy_host is not None and (cell is legacy_host or legacy_host in cell.descendants))):
             continue
         cell.decompose()
 

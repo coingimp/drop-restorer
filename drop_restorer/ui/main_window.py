@@ -110,7 +110,7 @@ class MainWindow(QMainWindow):
         sidebar = QVBoxLayout(side)
         sidebar.setContentsMargins(18, 24, 18, 22)
         sidebar.addWidget(QLabel('DropRestorer', objectName='brand'))
-        intro = QLabel('Из архива\nв ваш WordPress')
+        intro = QLabel('Восстановление\nархивных сайтов')
         sidebar.addWidget(intro)
         sidebar.addSpacing(30)
         self.stack = QStackedWidget()
@@ -173,7 +173,7 @@ class MainWindow(QMainWindow):
         return layout
 
     def create_restore_page(self):
-        layout = self.panel('Восстановить сайт', 'Укажите нужные страницы из Wayback. После обработки вы сможете проверить сайт во встроенном браузере.')
+        layout = self.panel('Восстановить сайт', 'Укажите страницы из Wayback и выберите, что получить после проверки: HTML-сайт или WordPress-тему с XML.')
         card = self.card(layout)
         card.addWidget(QLabel('1. Страницы из архива'))
         form = QFormLayout()
@@ -188,14 +188,22 @@ class MainWindow(QMainWindow):
         self.lang.setPlaceholderText('cs-CZ')
         self.domain = QLineEdit(self.settings.get('final_domain', ''))
         self.domain.setPlaceholderText('Необязательно: example.com')
+        self.output_format = QComboBox()
+        self.output_format.addItem('Статические HTML-страницы в ZIP', 'static_html')
+        self.output_format.addItem('Тема WordPress и XML для импорта', 'wordpress')
+        selected_format = self.output_format.findData(self.settings.get('output_format', 'wordpress'))
+        self.output_format.setCurrentIndex(selected_format if selected_format >= 0 else self.output_format.findData('wordpress'))
         form.addRow('Язык сайта', self.lang)
         form.addRow('Финальный домен', self.domain)
+        form.addRow('Формат результата', self.output_format)
         card.addLayout(form)
         card = self.card(layout)
         card.addWidget(QLabel('2. Раздел казино'))
-        hint = QLabel('Канониклы создаются автоматически. Контент, title и description вы добавите в WordPress.', objectName='muted')
-        hint.setWordWrap(True)
-        card.addWidget(hint)
+        self.casino_hint = QLabel(objectName='muted')
+        self.casino_hint.setWordWrap(True)
+        card.addWidget(self.casino_hint)
+        self.output_format.currentIndexChanged.connect(self.update_format_hint)
+        self.update_format_hint()
         grid = QGridLayout()
         self.casino_label = QLineEdit('Казино')
         grid.addWidget(QLabel('Название раздела'), 0, 0)
@@ -315,16 +323,24 @@ class MainWindow(QMainWindow):
     def save_settings(self):
         self.settings = {'lang': self.lang.text().strip(), 'final_domain': self.domain.text().strip(),
                          'endpoint': self.endpoint.text().strip(), 'model': self.model.text().strip(),
-                         'screenshots': self.auto_screens.isChecked()}
+                         'screenshots': self.auto_screens.isChecked(),
+                         'output_format': self.output_format.currentData()}
         self.settings_path.write_text(json.dumps(self.settings, ensure_ascii=False, indent=2), encoding='utf-8')
         self.statusBar().showMessage('Настройки сохранены.', 4000)
 
     def read_request(self):
         request = RestoreRequest(self.main_url.text().strip(), [x.strip() for x in self.menu_urls.toPlainText().splitlines() if x.strip()],
-            self.lang.text().strip(), self.domain.text().strip(),
-            [CasinoPage(title.text().strip(), slug.text().strip()) for title, slug in self.casino_fields], self.casino_label.text().strip())
+            lang=self.lang.text().strip(), final_domain=self.domain.text().strip(),
+            casino_pages=[CasinoPage(title.text().strip(), slug.text().strip()) for title, slug in self.casino_fields],
+            casino_label=self.casino_label.text().strip(), output_format=self.output_format.currentData())
         request.validate()
         return request
+
+    def update_format_hint(self):
+        if self.output_format.currentData() == 'static_html':
+            self.casino_hint.setText('Канониклы создаются автоматически. Казино-страницы попадут в ZIP как HTML-файлы: текст и SEO-поля можно добавить после распаковки. Для HTML-формата используйте URL без query-параметров и фрагментов.')
+        else:
+            self.casino_hint.setText('Канониклы создаются автоматически. Контент, title и description вы добавите в WordPress после импорта.')
 
     def task(self, action, done, cancellable=False):
         if self.worker is not None:
@@ -409,6 +425,8 @@ class MainWindow(QMainWindow):
         self.menu_urls.setPlainText('\n'.join(request.menu_pages))
         self.lang.setText(request.lang)
         self.domain.setText(request.final_domain)
+        self.output_format.setCurrentIndex(max(0, self.output_format.findData(request.output_format)))
+        self.update_format_hint()
         self.casino_label.setText(request.casino_label)
         for (title, slug), page in zip(self.casino_fields, request.casino_pages):
             title.setText(page.title)

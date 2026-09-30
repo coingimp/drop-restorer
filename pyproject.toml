@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "drop-restorer"
 version = "0.1.0"
-description = "Local browser-based Wayback to WordPress restoration with visual approval"
+description = "Local browser-based Wayback restoration to static HTML or WordPress with visual approval"
 requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3",

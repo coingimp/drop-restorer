@@ -180,7 +180,7 @@ class LibraryTests(unittest.TestCase):
 
     def test_thumbnail_reuses_desktop_screenshot_without_changing_approval(self):
         build = completed_fixture(self.state.root)
-        approve(build, build.digest())
+        approve(build, build.digest(), accept_findings=True)
         digest = build.digest()
         folder = build.root / 'preview_screenshots'
         Image.new('RGB', (1920, 1080), '#b3c9a6').save(folder / ('desktop_' + build.pages[0].key + '.png'))

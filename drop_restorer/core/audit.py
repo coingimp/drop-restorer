@@ -197,8 +197,11 @@ def inspect(build):
     for row in rows:
         row['checks'] = {key: sum(f['severity'] == 'error' and f['category'] == key and f['route'] == row['route'] for f in findings)
                          for key in CATEGORIES}
+    scope = SCOPE
+    if build.request.output_format == 'static_html':
+        scope = SCOPE.replace('экспорт WordPress', 'контрольные файлы сборки; ZIP статического сайта проверяется при упаковке')
     return {'version': VERSION, 'checked_at': datetime.now(timezone.utc).isoformat(), 'passed': errors == 0,
-            'errors': errors, 'warnings': warnings, 'scope': SCOPE, 'pages': rows, 'findings': findings,
+            'errors': errors, 'warnings': warnings, 'scope': scope, 'pages': rows, 'findings': findings,
             'removed': build.cleanup, 'removal_counts': dict(sum((Counter({row['kind']: row.get('count', 1)}) for row in build.cleanup), Counter())),
             'usage': usage_summary(build.root)}
 

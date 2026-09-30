@@ -166,6 +166,76 @@ class WebTests(unittest.TestCase):
         self.assertFalse(list(build.root.glob('*.zip')))
         self.assertIsNone(self.state.build.approved_digest)
 
+    def test_restoration_persists_selected_static_html_format(self):
+        from dataclasses import asdict
+        html = self.get('/').get_data(as_text=True)
+        self.assertIn('name="output_format"', html)
+        self.assertIn('value="wordpress"', html)
+        self.assertIn('value="static_html"', html)
+        real_pipeline = Pipeline
+        def fixture_pipeline(output, progress, log, cancel, agent):
+            return real_pipeline(output, progress, log, cancel, agent, client=FixtureArchive())
+        with patch('drop_restorer.web.server.Pipeline', side_effect=fixture_pipeline):
+            values = {**asdict(request()), 'output_format': 'static_html'}
+            self.assertEqual(self.post('/api/restore', values).status_code, 202)
+            self.wait()
+        build = self.state.build
+        self.assertEqual(build.status, 'metadata_review')
+        self.assertEqual(build.request.output_format, 'static_html')
+        saved = json.loads((build.root / 'project.json').read_text(encoding='utf-8'))
+        self.assertEqual(saved['request']['output_format'], 'static_html')
+        self.assertFalse((build.root / 'content.xml').exists())
+
+    def test_static_html_package_download_survives_project_reload(self):
+        build = self.ready()
+        build.request.output_format = 'static_html'
+        build.save()
+        self.state.select(build)
+        preview = self.preview(build)
+        response = self.post('/api/package', {'id': build.root.name, 'confirmed': True,
+                                              'accept_findings': True, **preview})
+        self.assertEqual(response.status_code, 202)
+        self.wait()
+        archive = self.state.archive
+        self.assertEqual(archive['kind'], 'static_html')
+        self.assertTrue(archive['name'].startswith('restoredexample-theme-html-'), archive['name'])
+        self.assertTrue(archive['install_checks']['passed'])
+        download = self.get(archive['url'])
+        self.assertEqual(download.status_code, 200)
+        download.close()
+        with zipfile.ZipFile(build.root / archive['name']) as zipped:
+            names = set(zipped.namelist())
+            self.assertIn('index.html', names)
+            self.assertIn('404.html', names)
+            self.assertNotIn('content.xml', names)
+            self.assertFalse(any(name.lower().endswith('.php') for name in names))
+        restored = Build.load(build.root)
+        reopened = self.state.saved_package(restored)
+        self.assertEqual(reopened['kind'], 'static_html')
+
+    def test_default_wordpress_package_still_contains_theme_xml_and_bundle(self):
+        build = self.ready()
+        self.assertEqual(build.request.output_format, 'wordpress')
+        preview = self.preview(build)
+        response = self.post('/api/package', {'id': build.root.name, 'confirmed': True,
+                                              'accept_findings': True, **preview})
+        self.assertEqual(response.status_code, 202)
+        self.wait()
+        archive = self.state.archive
+        self.assertEqual(archive['kind'], 'wordpress_theme')
+        self.assertIn('content', archive)
+        self.assertIn('bundle', archive)
+        with zipfile.ZipFile(build.root / archive['name']) as theme:
+            self.assertIn('restoredexample-theme/style.css', theme.namelist())
+            self.assertNotIn('content.xml', theme.namelist())
+        xml = self.get(archive['content']['url'])
+        self.assertEqual(xml.status_code, 200)
+        self.assertIn('<wp:wxr_version>', xml.get_data(as_text=True))
+        xml.close()
+        with zipfile.ZipFile(build.root / archive['bundle']['name']) as bundle:
+            self.assertIn('content.xml', bundle.namelist())
+
+
     def test_preview_is_separate_origin_and_navigation_loads(self):
         build = self.ready()
         info = self.preview(build)
@@ -201,7 +271,7 @@ class WebTests(unittest.TestCase):
     def test_approved_fixture_zip_download_contains_report(self):
         build = self.ready()
         info = self.preview(build)
-        self.post('/api/package', {'id':build.root.name, 'confirmed':True, **info})
+        self.post('/api/package', {'id':build.root.name, 'confirmed':True, 'accept_findings':True, **info})
         self.wait()
         archive = self.state.archive
         self.assertTrue(archive['name'].startswith('restoredexample-theme-'), archive['name'])
@@ -456,7 +526,7 @@ class WebTests(unittest.TestCase):
         build = self.ready()
         self.assertEqual(self.post('/api/repackage', {'id': build.root.name}).status_code, 400)
         from drop_restorer.core.packager import approve
-        approve(build, build.digest())
+        approve(build, build.digest(), accept_findings=True)
         before = (build.root/'project.json').read_bytes()
         self.assertEqual(self.post('/api/repackage', {'id': build.root.name}).status_code, 202)
         self.wait()

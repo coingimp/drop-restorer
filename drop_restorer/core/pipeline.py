@@ -290,7 +290,8 @@ class Pipeline:
             self.stage(96, 'Проверяем все 58 пунктов пользовательского чек-листа')
             report = inspect_site(build)
             self.log(f'CHECKLIST: ошибок {report["counts"].get("fail",0)}, требуют просмотра {report["counts"].get("review",0)}.')
-            self.stage(100, 'Сайт подготовлен. Проверьте SEO-чек-лист; тема и архив ожидают вашего решения.')
+            result_name = 'HTML-сайт' if request.output_format == 'static_html' else 'тема и XML-архив WordPress'
+            self.stage(100, 'Сайт подготовлен. Проверьте SEO-чек-лист; ' + result_name + ' ожидает вашего решения.')
             return build
         except Exception as error:
             pending.save()
@@ -307,14 +308,20 @@ class Pipeline:
         from .checklist import require_pass, approve_site
         if owner_approved is True:
             approve_site(build, viewed_fingerprint)
+        if build.request.output_format == 'static_html':
+            from .packager import _static_redirects
+            _static_redirects(build)
         require_pass(build)
         self.build = build
-        self.stage(95, 'Создаём тему и импорт после решения по сайту')
+        output_label = 'статический HTML-сайт' if build.request.output_format == 'static_html' else 'тему WordPress и XML-импорт'
+        self.stage(95, 'Подготавливаем ' + output_label + ' после решения по сайту')
         build.status = 'ready'
         try:
             write_site(build)
             audit(build)
-            self.stage(100, 'Тема готова. Проверьте результат и одобрите упаковку.')
+            self.stage(100, ('Страницы статического сайта готовы. Проверьте результат и одобрите ZIP.'
+                             if build.request.output_format == 'static_html'
+                             else 'Тема готова. Проверьте результат и одобрите упаковку.'))
             return build
         except Exception:
             build.status = 'site_review'

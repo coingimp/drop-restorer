@@ -188,6 +188,35 @@ class NavigationTests(unittest.TestCase):
         self.assertIn('dr-legacy-table-layout', soup.body.get('class', []))
         self.assertFalse(primary_menu_issues(soup))
 
+    def test_localized_strato_tree_buttons_keep_the_vertical_left_menu_on_casino_pages(self):
+        source = parse_html('''<body><table width="900"><tr>
+          <td valign="top"><table width="100"><tr><td><a href="/"><img alt="Startseite" src="/assets/media/home.png"></a></td></tr>
+          <tr><td><a href="/about/"><img alt="Über uns" src="/assets/media/about.png"></a></td></tr>
+          <tr><td><a href="/terms/"><img alt="Satzung" src="/assets/media/terms.png"></a></td></tr>
+          <tr><td><a href="/contact/"><img alt="Kontakt" src="/assets/media/contact.png"></a></td></tr></table></td>
+          <td width="700"><h2>Information</h2><p>Archived content long enough to identify the article region. '''
+          + 'More original text. ' * 12 + '''</p></td>
+          </tr></table></body>''')
+        clean(source, 'de-DE', [])
+        page = casino_shell(source, 'Casino rating')
+        navigation(page, self.pages, self.request)
+        from drop_restorer.core.casino_layout import apply_to_soup
+        apply_to_soup(page, {'casino_layout': {'content_width_px': 1120}})
+
+        menu = page.select_one('nav.dr-navigation[data-dr-placement="legacy-sidebar-menu"]')
+        self.assertIsNotNone(menu)
+        self.assertEqual(menu.get('data-dr-layout'), 'legacy-sidebar')
+        self.assertEqual(len(page.select('.dr-navigation')), 1)
+        self.assertEqual(len(menu.select('#dr-primary-menu > .dr-casino')), 1)
+        self.assertIn('dr-legacy-sidebar-column', menu.find_parent('td').get('class', []))
+        self.assertIn('dr-legacy-content-column', page.select_one('.dr-casino-content').get('class', []))
+        self.assertIsNotNone(page.select_one('.dr-legacy-sidebar-shell'))
+        self.assertIsNotNone(page.select_one('table.dr-legacy-sidebar-layout-table'))
+        self.assertIsNotNone(page.select_one('.dr-legacy-sidebar-shell > td.dr-legacy-sidebar-column'))
+        self.assertIsNotNone(page.select_one('.dr-legacy-sidebar-shell > td.dr-legacy-content-column'))
+        self.assertFalse(page.select_one('nav.dr-navigation[data-dr-placement="header-fallback"]'))
+        self.assertFalse(primary_menu_issues(page))
+
     def test_graphical_menu_keeps_distinct_archive_labels_when_titles_repeat(self):
         pages = [Page('home', '/', 'Sport-Forum Krefeld Stodolny GmBH', ''),
                  Page('hours', '/oeffnungszeiten.html', 'Sport-Forum Krefeld Stodolny GmBH', ''),

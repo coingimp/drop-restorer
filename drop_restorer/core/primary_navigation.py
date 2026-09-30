@@ -16,7 +16,8 @@ SECONDARY = re.compile(r'^(?:sidebar.*|.*sidebar|secondary|secondary-menu|second
 # archived ``topmenu`` name describes the old source location, not the visual
 # role the owner expects after recovery.  Keep the selectors narrow enough to
 # avoid moving modern header navigation merely because a site has a sidebar.
-LEGACY_LEFT_COLUMN = ('#left', '#leftcol', '#left-column', '.leftcol', '.left-column')
+LEGACY_LEFT_COLUMN = ('#left', '#leftcol', '#left-column', '.leftcol', '.left-column',
+                      '.dr-legacy-sidebar-column')
 LEGACY_CONTENT_COLUMN = ('#content', '#content-column', '#main-content')
 
 
@@ -34,9 +35,41 @@ def legacy_table_primary(soup):
     previous repair already inserted the generated menu, which makes the
     navigation pass idempotent.
     """
-    existing = soup.select_one('nav.dr-navigation[data-dr-placement="legacy-table-menu"]')
+    existing = soup.select_one(
+        'nav.dr-navigation[data-dr-placement="legacy-table-menu"], '
+        'nav.dr-navigation[data-dr-placement="legacy-sidebar-menu"]'
+    )
     if existing is not None:
         return existing, existing.find_parent(['td', 'div', 'section'])
+
+    # STRATO LivePages (and similar early hosted builders) generated their
+    # vertical left navigation as a stack of image links below ``/tree/``.
+    # There is no nav/list, useful id, width or height on those images, so the
+    # generic graphical-menu test misses it and the caller adds a new menu at
+    # the top of the document. Find the tightest table cell that contains the
+    # repeated tree-button links, while rejecting cells that also contain the
+    # article or a large unrelated link list.
+    tree_hosts = []
+    for host in soup.find_all('td'):
+        links = host.select('a[href]')
+        tree_links = [anchor for anchor in links if _tree_button_link(anchor)]
+        unique_routes = {anchor.get('href', '').split('#', 1)[0].strip()
+                         for anchor in tree_links
+                         if anchor.get('href', '').strip() not in ('', '#')}
+        if len(unique_routes) < 3 or len(tree_links) / max(len(links), 1) < 0.7:
+            continue
+        if host.find(['main', 'article']) or host.find_parent(['main', 'article']):
+            continue
+        # A vertical hosted-CMS menu lives in a narrow, explicitly sized
+        # nested table. Requiring that clue prevents ordinary image galleries
+        # from being promoted to the site's main navigation.
+        if len(host.get_text(' ', strip=True)) > 200 or not _has_narrow_tree_table(host):
+            continue
+        depth = len(list(host.parents))
+        tree_hosts.append((depth, -len(links), host))
+    if tree_hosts:
+        return None, max(tree_hosts, key=lambda row: row[:2])[2]
+
     candidates = []
     for host in soup.find_all(['td', 'div', 'section']):
         background = ' '.join((host.get('background', ''), host.get('style', '')))
@@ -71,6 +104,50 @@ def legacy_table_primary(soup):
 def _numeric_dimension(value):
     match = re.search(r'\d+', str(value or ''))
     return int(match.group()) if match else 0
+
+
+def _tree_button_link(anchor):
+    """Recognise an archived tree-button image before or after asset localization."""
+    for image in anchor.find_all('img'):
+        source = str(image.get('src', '')).casefold()
+        alt = str(image.get('alt', '')).strip()
+        if (image.has_attr('data-dr-legacy-tree-button') or '/tree/' in source
+                or alt and len(alt) <= 48):
+            return True
+    return False
+
+
+def _has_narrow_tree_table(host):
+    tables = list(dict.fromkeys([*host.find_parents('table'), *host.find_all('table')]))
+    for table in tables:
+        width = str(table.get('width', ''))
+        if not re.fullmatch(r'\s*\d{2,3}\s*(?:px)?\s*', width):
+            continue
+        if _numeric_dimension(width) > 260:
+            continue
+        links = table.select('a[href]')
+        tree_links = [anchor for anchor in links if _tree_button_link(anchor)]
+        routes = {anchor.get('href', '').split('#', 1)[0].strip()
+                  for anchor in tree_links
+                  if anchor.get('href', '').strip() not in ('', '#')}
+        if len(routes) >= 3 and len(tree_links) / max(len(links), 1) >= 0.7:
+            return True
+    return False
+
+
+def legacy_tree_sidebar(host):
+    """Return whether a table-menu host is a narrow image-button sidebar."""
+    if host is None or host.name != 'td':
+        return False
+    links = host.select('a[href]')
+    tree_links = [anchor for anchor in links if _tree_button_link(anchor)]
+    routes = {anchor.get('href', '').split('#', 1)[0].strip()
+              for anchor in tree_links
+              if anchor.get('href', '').strip() not in ('', '#')}
+    return (len(routes) >= 3
+            and len(tree_links) / max(len(links), 1) >= 0.7
+            and len(host.get_text(' ', strip=True)) <= 200
+            and _has_narrow_tree_table(host))
 
 
 def legacy_flash_primary(soup):

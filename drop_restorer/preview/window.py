@@ -112,7 +112,8 @@ class PreviewWindow(QMainWindow):
         self.checks_label = warnings
         warnings.setToolTip('\n'.join(build.warnings))
         bottom.addWidget(warnings, 1)
-        self.approve_button = QPushButton('Одобрить и упаковать')
+        self.approve_button = QPushButton('Одобрить и скачать HTML ZIP' if build.request.output_format == 'static_html'
+                                          else 'Одобрить и упаковать тему WordPress')
         self.approve_button.setStyleSheet('background:#19734a;color:white;padding:12px 22px;border:0;border-radius:6px;font-weight:600')
         self.approve_button.clicked.connect(self.approve_and_package)
         bottom.addWidget(self.approve_button)
@@ -231,15 +232,21 @@ class PreviewWindow(QMainWindow):
         if not self.loaded or self.capturing:
             return
         from ..core.theme_identity import theme_identity
-        name = theme_identity(self.build.request.origin).slug + '.zip'
-        destination, _ = QFileDialog.getSaveFileName(self, 'Сохранить тему для установщика WordPress', str(self.build.root / name), 'ZIP (*.zip)')
+        is_static = self.build.request.output_format == 'static_html'
+        suffix = '-html' if is_static else ''
+        name = theme_identity(self.build.request.origin).slug + suffix + '.zip'
+        title = 'Сохранить статический сайт' if is_static else 'Сохранить тему для установщика WordPress'
+        destination, _ = QFileDialog.getSaveFileName(self, title, str(self.build.root / name), 'ZIP (*.zip)')
         if not destination:
             return
         try:
             approve(self.build, self.viewed_digest)
             path = package(self.build, Path(destination))
             self.log.emit('APPROVED: Результат одобрен и упакован.')
-            QMessageBox.information(self, 'Установка WordPress', 'ZIP темы готов для «Внешний вид → Темы → Загрузить тему». Рядом сохранены XML страниц для «Инструменты → Импорт → WordPress» и полный комплект с суффиксом -bundle.zip.')
+            if is_static:
+                QMessageBox.information(self, 'HTML-сайт готов', 'Распакуйте содержимое ZIP в корень домена или статического хостинга. В архив включены страницы, ресурсы, 404, sitemap, robots и правила URL.')
+            else:
+                QMessageBox.information(self, 'Установка WordPress', 'ZIP темы готов для «Внешний вид → Темы → Загрузить тему». Рядом сохранены XML страниц для «Инструменты → Импорт → WordPress» и полный комплект с суффиксом -bundle.zip.')
             self.packaged.emit(str(path))
             self.close()
         except (RestorationError, OSError) as error:

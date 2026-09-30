@@ -8,7 +8,7 @@
 <body>
   <aside class="sidebar">
     <a class="brand" href="#projects"><span class="brandmark">↗</span> DropRestorer</a>
-    <p class="tagline">Из архива в ваш WordPress</p>
+    <p class="tagline">Восстановление архивных сайтов</p>
     <nav aria-label="Разделы инструмента">
       <button data-tab="projects">Сохранённые сборки</button>
       <button data-tab="restore">Восстановление</button>
@@ -54,7 +54,10 @@
         <label>Ссылка на главную страницу в Wayback<input name="main_page" type="url" required placeholder="https://web.archive.org/web/…/https://example.com/"></label>
         <label>Архивные страницы меню<textarea name="menu_pages" required rows="5" placeholder="Каждая ссылка — с новой строки"></textarea></label>
         <div class="cols"><label>Язык сайта<input name="lang" required value="cs-CZ"></label><label>Финальный домен <small>необязательно</small><input name="final_domain" placeholder="https://example.com"></label></div>
-        <hr><h2>Раздел казино</h2><p class="muted">Три пустые страницы. Канониклы создаются автоматически; контент и метаданные вы заполните в WordPress.</p>
+        <hr><h2>Формат результата</h2>
+        <label>Что собрать<select name="output_format"><option value="wordpress">Тема WordPress и XML-файл для импорта</option><option value="static_html">Статические HTML-страницы в ZIP</option></select></label>
+        <p id="output-format-help" class="muted">ZIP для WordPress содержит устанавливаемую тему и XML со страницами.</p>
+        <h2>Раздел казино</h2><p class="muted">Три страницы попадут в выбранный формат. Канониклы создаются автоматически; в статическом ZIP это HTML-файлы, в WordPress их можно заполнить после импорта.</p>
         <label>Название раздела в меню<input name="casino_label" value="Казино" required></label>
         <p>В адресах диакритика заменяется обычными латинскими буквами: í → i, č → c, ř → r. Названия и текст страниц сохраняются.</p>
         <div class="cols"><label>Название первой страницы<input name="title0" value="Рейтинг казино" required></label><label>Слаг после <code>/casino/</code><input name="slug0" value="casino-rating" required></label></div>
@@ -70,7 +73,7 @@
       <div id="metadata-content" hidden>
         <div id="metadata-status" class="info"></div>
         <article class="card casino-layout-card">
-          <h2>Оформление казино-страниц WordPress</h2>
+          <h2>Оформление казино-страниц</h2>
           <p id="casino-layout-help" class="muted">Ширина контента и главного меню настраивается отдельно и применяется только к страницам казино. На телефонах оболочка и меню автоматически занимают ширину экрана без горизонтального скролла.</p>
           <form id="casino-layout-form">
             <div class="cols">
@@ -121,7 +124,7 @@
     </section>
 
     <section id="checks" class="panel" hidden>
-      <div class="heading"><div><p class="eyebrow">КАЧЕСТВО СБОРКИ</p><h1>Проверки и расходы</h1><p>Отчёт по страницам, экспорту WordPress, удалённым элементам и запросам агента.</p></div><button id="run-checks" data-idle>Повторить проверки</button></div>
+      <div class="heading"><div><p class="eyebrow">КАЧЕСТВО СБОРКИ</p><h1>Проверки и расходы</h1><p>Отчёт по страницам, выбранному формату результата, удалённым элементам и запросам агента.</p></div><button id="run-checks" data-idle>Повторить проверки</button></div>
       <div id="checks-content" class="empty">Отчёт появится после сборки сайта.</div>
     </section>
 

@@ -26,7 +26,24 @@ MEASURE = r'''(() => {
   footer:!!document.querySelector('footer,[role=contentinfo],#ja-footer,#footer,#site-footer'),
   language_switcher_failed:!!document.querySelector('#lang_sel,#lang_sel_list,[id^="lang_sel_"],[class*="lang_sel"],[id*="wpml-ls"],[class*="wpml-ls"],.icl_lang_sel_widget,li.lang-item,.pll-parent-menu-item,.pll-switcher,[id*="qtranslate"],[class*="qtranslate"],#weglot_here,[id*="weglot"],[class*="weglot"],[class*="trp-language-switcher"],[id*="gtranslate"],[class*="gtranslate"],.language-switcher,.language_switcher,.language-selector,.language_selector,[id*="language-switcher"],[class*="language-switcher"],[id*="language_selector"],[class*="language_selector"],[data-language-switcher],[data-lang-switcher],img.iclflag,img.wpml-ls-flag'),
   menu_failed:innerWidth<=800 && (!button||!menu||button.getAttribute('aria-expanded')!=='true'||!visible(menu)||!casino||!submenu||casino.getAttribute('aria-expanded')!=='true'||!visible(submenu)),
-  menu_position_failed:(()=>{const nav=document.querySelector('.dr-navigation[data-dr-layout="wordpress-main-slot"]');if(!nav)return false;const host=document.querySelector('#head-menu'),items=[...nav.querySelectorAll('#dr-primary-menu > li')],rects=items.map(e=>e.getBoundingClientRect()),lang=document.querySelector('#lang_sel_list'),lr=lang?.getBoundingClientRect();return !host||!host.contains(nav)||(innerWidth>800&&(rects.some(r=>Math.abs(r.top-rects[0].top)>2)||Math.max(...rects.map(r=>r.bottom))>host.getBoundingClientRect().bottom+1||(lr&&rects.some(r=>r.right>lr.left-2&&r.left<lr.right+2&&r.bottom>lr.top&&r.top<lr.bottom))));})(),
+  menu_position_failed:(()=>{
+   const wpnav=document.querySelector('.dr-navigation[data-dr-layout="wordpress-main-slot"]');
+   if(wpnav){
+    const host=document.querySelector('#head-menu'),items=[...wpnav.querySelectorAll('#dr-primary-menu > li')],rects=items.map(e=>e.getBoundingClientRect()),lang=document.querySelector('#lang_sel_list'),lr=lang?.getBoundingClientRect();
+    if(!host||!host.contains(wpnav))return true;
+    if(innerWidth>800){const h=host.getBoundingClientRect(),split=rects.some(r=>Math.abs(r.top-rects[0].top)>2),outside=rects.some(r=>r.bottom>h.bottom+1),overlapsLanguage=lr&&rects.some(r=>r.right>lr.left-2&&r.left<lr.right+2&&r.bottom>lr.top&&r.top<lr.bottom);if(split||outside||overlapsLanguage)return true;}
+   }
+   const nav=document.querySelector('.dr-navigation[data-dr-layout="legacy-sidebar"]');
+   if(!nav||innerWidth<=800)return false;
+   const shell=nav.closest('.dr-legacy-sidebar-shell');
+   const host=shell?.querySelector(':scope > .dr-legacy-sidebar-column')||nav.closest('.dr-legacy-sidebar-column');
+   const content=shell?.querySelector(':scope > .dr-legacy-content-column');
+   const h=host?.getBoundingClientRect();
+   if(!h||h.width<100)return true;
+   if(document.body.classList.contains('dr-casino-page')){const c=content?.getBoundingClientRect();return !c||c.width<320||c.left<h.right-2;}
+   return false;
+  })(),
+  navigation_layout:(()=>{const nav=document.querySelector('.dr-navigation'),shell=nav?.closest('.dr-legacy-sidebar-shell'),host=shell?.querySelector(':scope > .dr-legacy-sidebar-column')||nav?.closest('.dr-legacy-sidebar-column'),content=shell?.querySelector(':scope > .dr-legacy-content-column'),table=document.querySelector('.dr-legacy-sidebar-layout-table');const box=e=>{if(!e)return null;const r=e.getBoundingClientRect();return {left:Math.round(r.left),right:Math.round(r.right),width:Math.round(r.width)};};return {layout:nav?.getAttribute('data-dr-layout')||'',host:box(host),content:box(content),shell:box(shell),table:box(table),table_css_width:table?getComputedStyle(table).width:''};})(),
   menu_links:[...document.querySelectorAll('#dr-primary-menu a[href]')].map(a=>a.getAttribute('href')),
   favicon:[...document.querySelectorAll('link[rel~=icon]')].map(e=>e.href)
  };

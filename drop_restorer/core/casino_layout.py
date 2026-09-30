@@ -65,7 +65,10 @@ def css_for_layout(layout: dict) -> str:
                        else 'calc(100% - 32px)')
     navigation_width_css = (f"min({navigation_width}px, calc(100vw - 32px))"
                             if navigation_width else '100%')
-    legacy_shell_width = 'fit-content' if layout['content_width_px'] else 'calc(100% - 32px)'
+    legacy_navigation_width = layout['navigation_width_px'] or 180
+    legacy_navigation_width_css = f'{legacy_navigation_width}px'
+    legacy_shell_width = (f"min(calc({layout['content_width_px']}px + {legacy_navigation_width}px), calc(100vw - 32px))"
+                          if layout['content_width_px'] else 'calc(100vw - 32px)')
     legacy_content_width = f"{layout['content_width_px']}px" if layout['content_width_px'] else 'auto'
     legacy_content_flex = (f"1 1 {layout['content_width_px']}px"
                            if layout['content_width_px'] else '1 1 auto')
@@ -128,15 +131,28 @@ body.dr-casino-page .dr-casino-content .dr-casino-table .casino-table tbody tr t
     width: {legacy_shell_width} !important; max-width: calc(100vw - 32px) !important; min-width: 0 !important;
     margin-left: auto !important; margin-right: auto !important;
   }}
-  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-column {{
-    box-sizing: border-box !important; flex: 0 0 auto !important; float: none !important; position: static !important;
-    left: auto !important; right: auto !important; min-width: 0 !important; max-width: 100% !important;
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-layout-table {{
+    box-sizing: border-box !important; width: {legacy_shell_width} !important; max-width: calc(100vw - 32px) !important;
+    min-width: 0 !important; margin-left: auto !important; margin-right: auto !important; table-layout: fixed !important;
+  }}
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > .dr-legacy-sidebar-column {{
+    box-sizing: border-box !important; flex: 0 0 {legacy_navigation_width_css} !important; width: {legacy_navigation_width_css} !important;
+    float: none !important; position: static !important; left: auto !important; right: auto !important;
+    min-width: 0 !important; max-width: {legacy_navigation_width_css} !important;
     margin-left: 0 !important; margin-right: 0 !important; overflow: visible !important;
   }}
-  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-content-column.dr-casino-content {{
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > .dr-legacy-content-column {{
     box-sizing: border-box !important; flex: {legacy_content_flex} !important; float: none !important; position: static !important;
-    left: auto !important; right: auto !important; width: {legacy_content_width} !important; max-width: {content} !important;
+    left: auto !important; right: auto !important; width: auto !important; max-width: none !important;
     min-width: 0 !important; margin-left: 0 !important; margin-right: 0 !important; overflow: visible !important;
+  }}
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > td:not(.dr-legacy-sidebar-column):not(.dr-legacy-content-column) {{ display: none !important; }}
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > .dr-legacy-sidebar-column > table,
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > .dr-legacy-content-column > table {{
+    box-sizing: border-box !important; width: 100% !important; max-width: 100% !important; table-layout: fixed !important;
+  }}
+  body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-content-column .dr-casino-content {{
+    box-sizing: border-box !important; width: 100% !important; max-width: 100% !important;
   }}
   body.dr-casino-page.dr-legacy-sidebar-navigation .dr-legacy-sidebar-shell > .cistic {{
     display: none !important;
@@ -172,6 +188,16 @@ def _mark_legacy_sidebar_layout(soup: BeautifulSoup) -> None:
     shell['class'] = list(dict.fromkeys([*shell.get('class', []), 'dr-legacy-sidebar-shell']))
     sidebar['class'] = list(dict.fromkeys([*sidebar.get('class', []), 'dr-legacy-sidebar-column']))
     content['class'] = list(dict.fromkeys([*content.get('class', []), 'dr-legacy-content-column']))
+    direct_sidebar = next((node for node in shell.find_all('td', recursive=False)
+                           if node is sidebar or sidebar in node.descendants), None)
+    direct_content = next((node for node in shell.find_all('td', recursive=False)
+                           if node is content or content in node.descendants), None)
+    if direct_sidebar is not None and direct_content is not None and direct_sidebar is not direct_content:
+        direct_sidebar['class'] = list(dict.fromkeys([*direct_sidebar.get('class', []), 'dr-legacy-sidebar-column']))
+        direct_content['class'] = list(dict.fromkeys([*direct_content.get('class', []), 'dr-legacy-content-column']))
+        shell_table = shell.find_parent('table')
+        if shell_table is not None:
+            shell_table['class'] = list(dict.fromkeys([*shell_table.get('class', []), 'dr-legacy-sidebar-layout-table']))
 
 
 def apply_to_soup(soup: BeautifulSoup, policy: dict | None) -> BeautifulSoup:

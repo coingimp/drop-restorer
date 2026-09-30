@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 from .models import RestorationError
-from ..runtime import python_executable
+from ..runtime import python_executable, workspace_root
 
 
 def failure_message(log_path, returncode):
@@ -15,7 +15,7 @@ def failure_message(log_path, returncode):
 
 
 def run(build, cancel, progress=lambda value,message:None):
-    workspace=Path(__file__).resolve().parents[2]
+    workspace=workspace_root(__file__)
     executable=python_executable(workspace)
     progress(97,'Проверяем страницы и меню в Desktop, Tablet и Mobile…')
     with (build.root/'browser-checks.log').open('w',encoding='utf-8') as output:
