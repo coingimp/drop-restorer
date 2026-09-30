@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import base64
+import mimetypes
 import re
 import zipfile
 from datetime import datetime, timezone
@@ -38,6 +40,112 @@ def _static_file_for_route(route: str) -> str:
     if re.search(r'\.[a-zA-Z0-9]{1,8}$', raw_segments[-1]):
         return '/'.join(raw_segments)
     return '/'.join(raw_segments + ['index.html'])
+
+
+_CSS_IMPORT_RE = re.compile(
+    r'''@import\s+(?:url\(\s*)?(?P<quote>["']?)(?P<url>[^"'()\s;]+)(?P=quote)\s*\)?(?P<media>[^;]*);''', re.I
+)
+_CSS_URL_RE = re.compile(r'''url\(\s*(?P<quote>["']?)(?P<url>.*?)(?P=quote)\s*\)''', re.I | re.S)
+
+
+def _static_css_asset(reference: str, assets_root: Path, relative_to: Path | None = None) -> Path | None:
+    """Resolve a same-site CSS asset without allowing paths outside assets/."""
+    parsed = urlsplit(reference.strip().strip('"\''))
+    if parsed.scheme or parsed.netloc or not parsed.path:
+        return None
+    path = unquote(parsed.path).replace('\\', '/')
+    if path.startswith('/assets/'):
+        relative = path[len('/assets/'):]
+    elif path.startswith('assets/'):
+        relative = path[len('assets/'):]
+    elif path.startswith('/'):
+        return None
+    elif relative_to is not None:
+        relative = (Path(relative_to.relative_to(assets_root.resolve()).as_posix()).parent / path).as_posix()
+    else:
+        return None
+    root = assets_root.resolve()
+    candidate = (root / Path(*relative.split('/'))).resolve()
+    if not candidate.is_relative_to(root):
+        raise RestorationError('CSS ссылается на ресурс за пределами папки assets/: ' + reference)
+    if not candidate.is_file():
+        raise RestorationError('Не найден ресурс CSS при встраивании оформления: ' + reference)
+    return candidate
+
+
+def _inline_css_text(css: str, assets_root: Path, relative_to: Path | None = None,
+                     seen: set[Path] | None = None) -> str:
+    seen = seen if seen is not None else set()
+
+    def expand_import(match):
+        reference = match.group('url')
+        target = _static_css_asset(reference, assets_root, relative_to)
+        if target is None:
+            raise RestorationError('Не удалось встроить внешний CSS import: ' + reference)
+        imported = _read_inline_css(target, assets_root, seen)
+        media = match.group('media').strip()
+        return f'@media {media} {{\n{imported}\n}}' if media else imported
+
+    css = _CSS_IMPORT_RE.sub(expand_import, css)
+
+    def embed_url(match):
+        reference = match.group('url').strip().strip('"\'')
+        parsed = urlsplit(reference)
+        if (not reference or reference.startswith('#') or parsed.scheme or parsed.netloc
+                or parsed.path.startswith('//')):
+            return match.group(0)
+        target = _static_css_asset(reference, assets_root, relative_to)
+        if target is None:
+            return match.group(0)
+        mime = mimetypes.guess_type(target.name)[0] or 'application/octet-stream'
+        payload = base64.b64encode(target.read_bytes()).decode('ascii')
+        fragment = ('#' + parsed.fragment) if parsed.fragment else ''
+        return f'url("data:{mime};base64,{payload}{fragment}")'
+
+    return _CSS_URL_RE.sub(embed_url, css)
+
+
+def _read_inline_css(path: Path, assets_root: Path, seen: set[Path]) -> str:
+    path = path.resolve()
+    if path in seen:
+        return ''
+    seen.add(path)
+    css = path.read_text(encoding='utf-8-sig', errors='replace')
+    return _inline_css_text(css, assets_root, relative_to=path, seen=seen)
+
+
+def _inline_static_page_css(source: str, assets_root: Path) -> str:
+    """Replace local stylesheet links with portable <style> blocks in HTML."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(source, 'html.parser')
+    if soup.head is None:
+        head = soup.new_tag('head')
+        html_node = soup.html
+        if html_node is None:
+            html_node = soup.new_tag('html')
+            soup.insert(0, html_node)
+        html_node.insert(0, head)
+
+    for existing in soup.select('style'):
+        css = _inline_css_text(existing.string or existing.get_text(), assets_root)
+        existing.clear()
+        existing.append(css)
+
+    for link in list(soup.select('link[rel~="stylesheet"]')):
+        href = str(link.get('href') or '').strip()
+        target = _static_css_asset(href, assets_root)
+        if target is None:
+            raise RestorationError('В режиме встроенного CSS найдена внешняя таблица стилей: ' + (href or '(без адреса)'))
+        css = _read_inline_css(target, assets_root, set())
+        style = soup.new_tag('style')
+        style['data-drop-restorer-inline-css'] = href
+        for attribute in ('media', 'title', 'nonce', 'disabled'):
+            if link.has_attr(attribute):
+                style[attribute] = link.get(attribute)
+        style.string = css
+        link.replace_with(style)
+    return str(soup)
 
 
 def _static_redirects(build):
@@ -121,14 +229,23 @@ def _validate_static_zip(path: Path, build, expected_pages):
                 for meta in re.findall(r'(?is)<meta\b[^>]*>', source):
                     if re.search(r'(?i)\bnoindex\b', meta):
                         raise RestorationError('В статической странице сохранился запрет индексации: ' + page_name)
+                if build.request.static_css_mode == 'inline':
+                    from bs4 import BeautifulSoup
+                    page_soup = BeautifulSoup(source, 'html.parser')
+                    if page_soup.select('link[rel~="stylesheet"][href]'):
+                        raise RestorationError('В режиме встроенного CSS страница всё ещё зависит от внешнего CSS: ' + page_name)
                 for asset in re.findall(r'''(?i)(?:src|href|poster)\s*=\s*["'](/assets/[^"'?#]+)''', source):
                     if unquote(asset.lstrip('/')) not in names:
                         raise RestorationError('Не найден ресурс статической страницы: ' + asset)
             if archive.testzip() is not None:
                 raise RestorationError('Контроль целостности HTML ZIP не пройден.')
+            checks = ['html_routes', 'assets_included', '404_page', 'robots_and_sitemap',
+                      'static_host_rules', 'no_wordpress_or_xml', 'safe_unique_paths', 'zip_crc']
+            if build.request.static_css_mode == 'inline':
+                checks.append('inline_css')
             return {'passed': True, 'kind': 'static_html', 'pages': len(expected_pages), 'files': len(names),
-                    'checks': ['html_routes', 'assets_included', '404_page', 'robots_and_sitemap',
-                               'static_host_rules', 'no_wordpress_or_xml', 'safe_unique_paths', 'zip_crc']}
+                    'css_mode': build.request.static_css_mode,
+                    'checks': checks}
     except zipfile.BadZipFile as error:
         raise RestorationError('Повреждён архив статического сайта.') from error
 
@@ -159,10 +276,14 @@ def _package_static_html(build, destination, report, seo_report):
     css_path = assets_root / 'site-404.css'
     css = css_path.read_text(encoding='utf-8') if css_path.is_file() else ''
     apache, netlify = _static_rules(build, redirects, routes)
+    css_note = ('Оформление страниц встроено в HTML через блоки `<style>`; таблицы стилей не нужно загружать отдельно. '
+                'Папка `assets/` содержит изображения, шрифты и скрипты.\n\n'
+                if build.request.static_css_mode == 'inline' else
+                'Файлы оформления и изображений находятся в `assets/`; ссылки на CSS работают при размещении сайта в корне домена.\n\n')
     readme = (
         '# Статический сайт\n\n'
-        'Распакуйте содержимое ZIP в корневую папку домена или статического хостинга. Главная страница — `index.html`; '
-        'архивные и казино-страницы сохранены по выбранным URL; файлы оформления и изображений находятся в `assets/`.\n\n'
+        'Распакуйте содержимое ZIP в папку сайта. Главная страница — `index.html`; '
+        'архивные и казино-страницы сохранены по выбранным URL.\n\n' + css_note +
         '`robots.txt`, `sitemap.xml` и оформленная `404.html` уже включены. Правила 301 и маршрутизация сохранены в '
         '`.htaccess` для Apache и `_redirects` для Netlify/Cloudflare Pages. Для другого сервера перенесите правила из '
         'этих файлов в его конфигурацию. Размещение рассчитано на корень домена; при смене домена обновите canonical '
@@ -177,7 +298,11 @@ def _package_static_html(build, destination, report, seo_report):
             created = True
             with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
                 for source, name in page_files:
-                    archive.write(source, name)
+                    if build.request.static_css_mode == 'inline':
+                        html = source.read_text(encoding='utf-8-sig', errors='replace')
+                        archive.writestr(name, _inline_static_page_css(html, assets_root).encode('utf-8'))
+                    else:
+                        archive.write(source, name)
                 for source in sorted(assets_root.rglob('*')):
                     if source.is_file():
                         archive.write(source, 'assets/' + source.relative_to(assets_root).as_posix())
@@ -193,9 +318,11 @@ def _package_static_html(build, destination, report, seo_report):
         if build.digest() != build.approved_digest:
             raise RestorationError('Файлы изменились во время упаковки. Повторите просмотр.')
         report['output_format'] = 'static_html'
+        report['static_css_mode'] = build.request.static_css_mode
         report['static_package'] = install_checks
         receipt = {'approved_at': datetime.now(timezone.utc).isoformat(), 'digest': build.approved_digest,
                    'format': 'static-html-v1', 'archive': str(destination), 'pages': len(build.pages),
+                   'css_mode': build.request.static_css_mode,
                    'owner_approvals': build.owner_approvals, 'install_checks': install_checks,
                    'sha256': {destination.name: hashlib.sha256(destination.read_bytes()).hexdigest()}}
         from .seo_contract import save_json

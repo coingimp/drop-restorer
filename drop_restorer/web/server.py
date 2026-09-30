@@ -182,6 +182,7 @@ class Workspace:
                     or hashlib.sha256(path.read_bytes()).hexdigest() != receipt.get('sha256', {}).get(path.name)):
                 return None
             return {**self.register_file(path), 'kind': 'static_html', 'pages': receipt.get('pages'),
+                    'css_mode': receipt.get('css_mode', 'linked'),
                     'install_checks': receipt.get('install_checks')}
         if receipt.get('format') != 'wordpress-theme-v1':
             return None

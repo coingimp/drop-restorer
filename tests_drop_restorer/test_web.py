@@ -172,23 +172,28 @@ class WebTests(unittest.TestCase):
         self.assertIn('name="output_format"', html)
         self.assertIn('value="wordpress"', html)
         self.assertIn('value="static_html"', html)
+        self.assertIn('name="static_css_mode"', html)
+        self.assertIn('value="inline"', html)
         real_pipeline = Pipeline
         def fixture_pipeline(output, progress, log, cancel, agent):
             return real_pipeline(output, progress, log, cancel, agent, client=FixtureArchive())
         with patch('drop_restorer.web.server.Pipeline', side_effect=fixture_pipeline):
-            values = {**asdict(request()), 'output_format': 'static_html'}
+            values = {**asdict(request()), 'output_format': 'static_html', 'static_css_mode': 'inline'}
             self.assertEqual(self.post('/api/restore', values).status_code, 202)
             self.wait()
         build = self.state.build
         self.assertEqual(build.status, 'metadata_review')
         self.assertEqual(build.request.output_format, 'static_html')
+        self.assertEqual(build.request.static_css_mode, 'inline')
         saved = json.loads((build.root / 'project.json').read_text(encoding='utf-8'))
         self.assertEqual(saved['request']['output_format'], 'static_html')
+        self.assertEqual(saved['request']['static_css_mode'], 'inline')
         self.assertFalse((build.root / 'content.xml').exists())
 
     def test_static_html_package_download_survives_project_reload(self):
         build = self.ready()
         build.request.output_format = 'static_html'
+        build.request.static_css_mode = 'inline'
         build.save()
         self.state.select(build)
         preview = self.preview(build)
@@ -198,6 +203,7 @@ class WebTests(unittest.TestCase):
         self.wait()
         archive = self.state.archive
         self.assertEqual(archive['kind'], 'static_html')
+        self.assertEqual(archive['css_mode'], 'inline')
         self.assertTrue(archive['name'].startswith('restoredexample-theme-html-'), archive['name'])
         self.assertTrue(archive['install_checks']['passed'])
         download = self.get(archive['url'])
@@ -207,6 +213,8 @@ class WebTests(unittest.TestCase):
             names = set(zipped.namelist())
             self.assertIn('index.html', names)
             self.assertIn('404.html', names)
+            self.assertNotIn('rel="stylesheet"', zipped.read('index.html').decode('utf-8'))
+            self.assertIn('data-drop-restorer-inline-css=', zipped.read('index.html').decode('utf-8'))
             self.assertNotIn('content.xml', names)
             self.assertFalse(any(name.lower().endswith('.php') for name in names))
         restored = Build.load(build.root)

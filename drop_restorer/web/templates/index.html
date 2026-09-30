@@ -57,6 +57,7 @@
         <hr><h2>Формат результата</h2>
         <label>Что собрать<select name="output_format"><option value="wordpress">Тема WordPress и XML-файл для импорта</option><option value="static_html">Статические HTML-страницы в ZIP</option></select></label>
         <p id="output-format-help" class="muted">ZIP для WordPress содержит устанавливаемую тему и XML со страницами.</p>
+        <div id="static-css-options" hidden><label>Как подключить стили<select name="static_css_mode"><option value="linked">Отдельные CSS-файлы в папке assets</option><option value="inline">Встроить CSS в HTML-страницы</option></select></label><p class="muted">Встроенный режим сохраняет адаптивные правила и не зависит от расположения папки assets.</p></div>
         <h2>Раздел казино</h2><p class="muted">Три страницы попадут в выбранный формат. Канониклы создаются автоматически; в статическом ZIP это HTML-файлы, в WordPress их можно заполнить после импорта.</p>
         <label>Название раздела в меню<input name="casino_label" value="Казино" required></label>
         <p>В адресах диакритика заменяется обычными латинскими буквами: í → i, č → c, ř → r. Названия и текст страниц сохраняются.</p>

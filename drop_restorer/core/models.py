@@ -128,10 +128,13 @@ class RestoreRequest:
     casino_pages: list[CasinoPage] = field(default_factory=lambda: list(DEFAULT_CASINO))
     casino_label: str = 'Казино'
     output_format: str = 'wordpress'
+    static_css_mode: str = 'linked'
 
     def validate(self) -> list[Snapshot]:
         if self.output_format not in ('wordpress', 'static_html'):
             raise RestorationError('Выберите формат результата: WordPress или статический HTML.')
+        if self.static_css_mode not in ('linked', 'inline'):
+            raise RestorationError('Выберите способ оформления HTML: отдельные CSS-файлы или стили внутри HTML.')
         if not self.menu_pages:
             raise RestorationError('Добавьте хотя бы одну архивную страницу меню.')
         snapshots = [Snapshot.parse(x) for x in [self.main_page, *self.menu_pages]]
@@ -219,6 +222,10 @@ class Build:
         digest = hashlib.sha256()
         if self.request.output_format != 'wordpress':
             digest.update(self.request.output_format.encode('utf-8'))
+        # Keep the digest for existing static HTML projects that predate this
+        # option stable when they use the linked-CSS default.
+        if self.request.output_format == 'static_html' and self.request.static_css_mode != 'linked':
+            digest.update(b'\0static-css:inline')
         if self.seo_policy:
             digest.update(json.dumps(self.seo_policy, ensure_ascii=False, sort_keys=True).encode())
         for folder in ('theme', 'pages'):
