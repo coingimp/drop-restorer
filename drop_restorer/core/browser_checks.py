@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 from .models import RestorationError
-from ..runtime import python_executable, workspace_root
+from ..runtime import python_module_command, workspace_root
 
 
 def failure_message(log_path, returncode):
@@ -16,10 +16,9 @@ def failure_message(log_path, returncode):
 
 def run(build, cancel, progress=lambda value,message:None):
     workspace=workspace_root(__file__)
-    executable=python_executable(workspace)
     progress(97,'Проверяем страницы и меню в Desktop, Tablet и Mobile…')
     with (build.root/'browser-checks.log').open('w',encoding='utf-8') as output:
-        process=subprocess.Popen([str(executable),'-X','utf8','-m','drop_restorer.web.site_probe',str(build.root)],
+        process=subprocess.Popen(python_module_command(workspace,'drop_restorer.web.site_probe',str(build.root)),
             cwd=workspace,stdout=output,stderr=output,env=dict(os.environ,QT_QPA_PLATFORM='offscreen',QTWEBENGINE_CHROMIUM_FLAGS='--disable-gpu'),
             creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         try:

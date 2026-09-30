@@ -41,6 +41,11 @@ def workspace_root(anchor: str | Path | None = None) -> Path:
     return module.parents[1]
 
 
+def is_packaged_application() -> bool:
+    """Recognize binaries produced by PyInstaller or Nuitka."""
+    return bool(getattr(sys, 'frozen', False) or '__compiled__' in globals())
+
+
 def python_executable(workspace: Path) -> Path:
     """Return the interpreter belonging to *workspace* when it exists.
 
@@ -64,3 +69,20 @@ def python_executable(workspace: Path) -> Path:
         if candidate.is_file():
             return candidate
     return Path(sys.executable).resolve()
+
+
+def python_module_command(workspace: Path, module: str, *arguments: str | Path) -> list[str]:
+    """Build a subprocess command that also works from the frozen desktop app."""
+    values = [str(argument) for argument in arguments]
+    if is_packaged_application():
+        modes = {
+            "drop_restorer.web": "--server",
+            "drop_restorer.web.capture": "--capture",
+            "drop_restorer.web.site_probe": "--site-probe",
+        }
+        try:
+            mode = modes[module]
+        except KeyError as error:
+            raise ValueError(f"Unsupported frozen subprocess module: {module}") from error
+        return [str(Path(sys.executable).resolve()), mode, *values]
+    return [str(python_executable(workspace)), "-X", "utf8", "-m", module, *values]

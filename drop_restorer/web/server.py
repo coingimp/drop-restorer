@@ -35,7 +35,7 @@ from ..core.review import can_apply, issues, source_metadata
 from ..core.usage import initialize, metered, summary
 from ..core.wordpress import write_site
 from ..preview.server import PreviewServer
-from ..runtime import python_executable
+from ..runtime import python_module_command
 from .thumbnails import Thumbnails
 
 
@@ -345,7 +345,7 @@ class Workspace:
         self.invalidate_preview()
 
 
-def create_app(workspace: Path, port=8780):
+def create_app(workspace: Path, port=8780, desktop_service=False):
     state = Workspace(workspace)
     app = Flask(__name__, template_folder='templates', static_folder='static')
     app.config.update(MAX_CONTENT_LENGTH=20_000_000, JSON_AS_ASCII=False)
@@ -389,6 +389,15 @@ def create_app(workspace: Path, port=8780):
     @app.get('/health')
     def health():
         return jsonify(app='DropRestorer Web', version=1, workspace=str(state.workspace))
+
+    if desktop_service:
+        @app.post('/api/desktop/shutdown')
+        def desktop_shutdown():
+            server = app.extensions.get('drop_restorer_http_server')
+            if server is None:
+                abort(404)
+            threading.Thread(target=server.shutdown, daemon=True, name='drop-restorer-desktop-shutdown').start()
+            return jsonify(ok=True)
 
     @app.get('/api/state')
     def status():
@@ -807,8 +816,7 @@ def create_app(workspace: Path, port=8780):
             if device not in ('', 'Desktop', 'Tablet', 'Mobile'):
                 raise RestorationError('Неизвестный размер экрана.')
             def capture():
-                executable = python_executable(state.workspace)
-                args = [str(executable), '-X', 'utf8', '-m', 'drop_restorer.web.capture', str(build.root)]
+                args = python_module_command(state.workspace, 'drop_restorer.web.capture', str(build.root))
                 if key:
                     args += ['--key', key, '--device', device or 'Desktop']
                 environment = dict(os.environ, QT_QPA_PLATFORM='offscreen', QTWEBENGINE_CHROMIUM_FLAGS='--disable-gpu')

@@ -15,7 +15,7 @@ from PIL import Image
 
 from ..core.library import inventory, is_link, load_card, project_directory
 from ..core.models import RestorationError
-from ..runtime import python_executable, workspace_root
+from ..runtime import python_module_command, workspace_root
 
 
 class Thumbnails:
@@ -84,13 +84,13 @@ class Thumbnails:
             source = max(candidates, key=lambda p: p.stat().st_mtime)
         else:
             source = folder / 'source.png'
-            executable = python_executable(workspace_root(__file__))
+            workspace = workspace_root(__file__)
             with (folder / 'capture.log').open('w', encoding='utf-8') as log:
                 with self.guard:
                     if root.name in self.blocked or self.stopped.is_set():
                         return
-                    self.child = subprocess.Popen([str(executable), '-X', 'utf8', '-m', 'drop_restorer.web.capture', str(root), '--key', key, '--cover'],
-                        cwd=workspace_root(__file__), stdout=log, stderr=log,
+                    self.child = subprocess.Popen(python_module_command(workspace, 'drop_restorer.web.capture', str(root), '--key', key, '--cover'),
+                        cwd=workspace, stdout=log, stderr=log,
                         env=dict(os.environ, QT_QPA_PLATFORM='offscreen', QTWEBENGINE_CHROMIUM_FLAGS='--disable-gpu'),
                         creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                     child = self.child

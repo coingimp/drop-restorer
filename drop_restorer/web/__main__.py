@@ -18,6 +18,7 @@ def main():
     parser.add_argument('--port', type=int, default=8780)
     parser.add_argument('--project', type=Path)
     parser.add_argument('--background', action='store_true', help='Write startup and error output to web-server.log.')
+    parser.add_argument('--desktop-service', action='store_true', help='Enable authenticated desktop shutdown for the native shell.')
     args = parser.parse_args()
     if not 1024 <= args.port <= 65535:
         parser.error('Port must be between 1024 and 65535.')
@@ -58,7 +59,7 @@ def run_server(args, workspace):
     from .server import create_app, write_json
 
     gui = QGuiApplication.instance() or QGuiApplication([])
-    app = create_app(workspace, args.port)
+    app = create_app(workspace, args.port, desktop_service=args.desktop_service)
     state = app.extensions['workspace']
     if args.project:
         root = args.project.resolve()
@@ -66,6 +67,7 @@ def run_server(args, workspace):
             raise ValueError('Project must belong to this workspace.')
         state.select(state.project(root.name))
     server = make_server('127.0.0.1', args.port, app, threaded=True, request_handler=QuietHandler)
+    app.extensions['drop_restorer_http_server'] = server
     write_json(state.root / 'web-server.json', {'pid': os.getpid(), 'port': args.port,
                'url': f'http://127.0.0.1:{args.port}', 'workspace': str(workspace)})
     try:

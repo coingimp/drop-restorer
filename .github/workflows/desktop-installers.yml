@@ -1,0 +1,91 @@
+name: Desktop installers
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2025
+            label: Windows-x64
+          - runner: macos-15
+            label: macOS-Apple-Silicon
+          - runner: macos-15-intel
+            label: macOS-Intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install app and freezer
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pyinstaller==6.22.2
+      - name: Read app version
+        id: version
+        run: python -c "import os,tomllib; from pathlib import Path; version=tomllib.loads(Path('pyproject.toml').read_text())['project']['version']; Path(os.environ['GITHUB_OUTPUT']).open('a').write('value='+version+'\n')"
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build native installer
+        run: python scripts/build_desktop.py installer
+      - name: Install and smoke test Windows setup
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.value }}'
+          $installer = Resolve-Path "dist/installers/DropRestorer-$version-Windows-x64-Setup.exe"
+          $installDir = Join-Path $env:RUNNER_TEMP 'drop-restorer-installed'
+          $workspace = Join-Path $env:RUNNER_TEMP 'drop-restorer-smoke'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT', "/DIR=`"$installDir`"") -Wait -PassThru -WindowStyle Hidden
+          if ($install.ExitCode -ne 0) { throw "Inno Setup failed: $($install.ExitCode)" }
+          $bundle = Join-Path $installDir 'DropRestorer.exe'
+          if (-not (Test-Path -LiteralPath $bundle)) { throw 'Setup did not install DropRestorer.exe.' }
+          $smoke = Start-Process -FilePath $bundle -ArgumentList @('--smoke-ui', '--workspace', "`"$workspace`"", '--port', '18878') -Wait -PassThru -WindowStyle Hidden
+          if ($smoke.ExitCode -ne 0) { throw "Packaged application smoke test failed: $($smoke.ExitCode)" }
+          $report = Get-Content -LiteralPath (Join-Path $workspace 'var/drop-restorer/desktop-smoke-report.json') -Raw | ConvertFrom-Json
+          if (-not $report.ok) { throw 'Packaged application UI report failed.' }
+          $uninstall = Start-Process -FilePath (Join-Path $installDir 'unins000.exe') -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART') -Wait -PassThru -WindowStyle Hidden
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstall failed: $($uninstall.ExitCode)" }
+          if (-not (Test-Path -LiteralPath $workspace)) { throw 'Uninstall unexpectedly removed user data.' }
+      - name: Smoke test macOS installer payload
+        if: runner.os == 'macOS'
+        run: |
+          APP="$(pwd)/dist/DropRestorer.app/Contents/MacOS/DropRestorer"
+          "$APP" --smoke-ui --workspace "$RUNNER_TEMP/drop-restorer-smoke" --port 18878
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DropRestorer-${{ matrix.label }}-${{ steps.version.outputs.value }}
+          path: dist/installers/*
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: DropRestorer-*
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          generate_release_notes: true
